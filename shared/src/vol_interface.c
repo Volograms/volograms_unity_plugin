@@ -1,9 +1,13 @@
-//
-//  main.cpp
-//  UnityPlugin
-//
-//  Created by Patrick Geoghegan on 21/07/2021.
-//  Unity logging taken from: https://stackoverflow.com/questions/43732825/use-debug-log-from-c
+/** @file vol_interface.c
+ * Volograms SDK Audio-Video Decoding API
+ *
+ * Version:   0.1 \n
+ * Authors:   Patrick Geoghegan <patrick@volograms.com> \n
+ *            Anton Gerdelan <anton@volograms.com> \n
+ * Copyright: 2021, Volograms (http://volograms.com/) \n
+ * Language:  C99 \n
+ * Licence:   The MIT License. See LICENSE.md for details. \n
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,7 +43,8 @@ extern "C"
 #include <math.h> // TODO: Remove when test function `Plasma` is removed
     
 #include "IUnityRenderingExtensions.h"
-    
+
+//  Unity logging taken from: https://stackoverflow.com/questions/43732825/use-debug-log-from-c 
 /** Unity logging callback type */
 typedef void(*FuncCallBack)(const char* message, int color, int size);
 
