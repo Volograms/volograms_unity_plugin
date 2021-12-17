@@ -53,7 +53,8 @@ LOCAL_ARM_MODE  := arm
 LOCAL_PATH      := $(NDK_PROJECT_PATH)
 LOCAL_MODULE    := libnative
 LOCAL_CFLAGS    := -Werror
-LOCAL_SRC_FILES := NativeCode.c vol_geom.c
+LOCAL_C_INCLUDES			+= $(NDK_PROJECT_PATH)/../../shared/src/
+LOCAL_SRC_FILES := NativeCode.c #vol_geom.c
 LOCAL_LDLIBS    := -llog
 LOCAL_SHARED_LIBRARIES += avcodec avdevice avfilter avformat avutil swresample swscale
 
@@ -66,7 +67,9 @@ LOCAL_CFLAGS    			:= -Werror -DANDROID_DEBUG
 LOCAL_LDLIBS    			:= -llog
 LOCAL_C_INCLUDES 			+= $(UNITY_INCLUDE)/
 LOCAL_C_INCLUDES 			+= /usr/local/Cellar/ffmpeg/4.4_2/include/
-LOCAL_SRC_FILES  			:= vol_interface.c vol_geom.c vol_av.c  
+LOCAL_C_INCLUDES			+= $(NDK_PROJECT_PATH)/../../shared/src/
+#LOCAL_SRC_FILES  			:= vol_interface.c vol_geom.c vol_av.c  
+LOCAL_SRC_FILES				:= ../../shared/src/vol_interface.c ../../shared/src/vol_geom.c ../../shared/src/vol_av.c
 LOCAL_MODULE     			:= volplayer
 LOCAL_SHARED_LIBRARIES 		+= avcodec avdevice avfilter avformat avutil swresample swscale
 

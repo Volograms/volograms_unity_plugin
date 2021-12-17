@@ -18,6 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef ANDROID_DEBUG
+#include <android/log.h>
+#endif
+
 /** To suppress compiler warnings. */
 #define VOL_AV_UNUSED( x ) (void)( x )
 
@@ -56,6 +60,12 @@ static void _dbprinterr( int line, const char* fmt, ... ) {
   va_start( args, fmt );
   vfprintf( stderr, fmt, args );
   va_end( args );
+#elif ANDROID_DEBUG
+  va_list args;
+  __android_log_print(ANDROID_LOG_ERROR, "VOL_LIB", "ERROR vol_av.c:%i ", line);
+  va_start( args, fmt );
+  __android_log_print(ANDROID_LOG_ERROR, "VOL_LIB", fmt, args);
+  va_end( args );
 #else
   VOL_AV_UNUSED( fmt );
   VOL_AV_UNUSED( line );
@@ -73,6 +83,12 @@ static void _dbprint( const char* fmt, ... ) {
   fprintf( stdout, "vol_av: " );
   va_start( args, fmt );
   vfprintf( stdout, fmt, args );
+  va_end( args );
+#elif ANDROID_DEBUG
+  va_list args;
+  __android_log_print(ANDROID_LOG_VERBOSE, "VOL_LIB", "vol_av: ");
+  va_start( args, fmt );
+  __android_log_print(ANDROID_LOG_VERBOSE, "VOL_LIB", fmt, args);
   va_end( args );
 #else
   VOL_AV_UNUSED( fmt );
