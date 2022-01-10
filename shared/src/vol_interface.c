@@ -43,7 +43,9 @@ extern "C"
 #include <stdbool.h>
 #include <math.h> // TODO: Remove when test function `Plasma` is removed
     
+#ifdef ENABLE_UNITY_RENDER_FUNCS
 #include "IUnityRenderingExtensions.h"
+#endif
 
 //  Unity logging taken from: https://stackoverflow.com/questions/43732825/use-debug-log-from-c 
 /** Unity logging callback type */
