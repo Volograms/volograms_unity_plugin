@@ -14,6 +14,7 @@
 #include <time.h>
 #include <stdint.h> // include uint types
 #include <string.h> // include memcpy()
+#include <unistd.h> // Added only for debugging, should be removed for builds
 #ifdef _WIN32
 #include <malloc.h> // include alloca()
 #else
@@ -317,6 +318,7 @@ DllExport uint8_t * native_vol_read_next_frame(void)
     return video_file_ptr.pixels_ptr;
 }
     
+#ifdef ENABLE_UNITY_RENDER_FUNCS
 /**
  UNITY RENDERING FUNCTIONS
  */
@@ -365,6 +367,8 @@ UnityRenderingEventAndData UNITY_INTERFACE_API get_texture_update_callback(void)
 {
     return _texture_update_callback;
 }
+
+#endif
 
 #if __cplusplus
 }

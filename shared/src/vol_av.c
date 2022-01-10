@@ -102,6 +102,7 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
   if ( !filename || !info_ptr || info_ptr->_context_ptr != NULL ) { return false; }
 
   _dbprint( "opening URL `%s`...\n", filename );
+  _dbprint( filename );
 
   memset( info_ptr, 0, sizeof( vol_av_video_t ) );
   info_ptr->_context_ptr = calloc( 1, sizeof( vol_av_internal_t ) );
@@ -112,8 +113,12 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
   vol_av_internal_t* p = info_ptr->_context_ptr;
 
   { // Open the file and read its header. The codecs are not opened. -- note that if first param is NULL then this allocates memory.
-    if ( avformat_open_input( &p->fmt_ctx_ptr, filename, NULL, NULL ) < 0 ) { // NOTE(Anton) the second param is `url` and we can try a web stream.
-      _dbprinterr( __LINE__, "Failed to open input file.\n" );
+    int av_open_check = avformat_open_input( &p->fmt_ctx_ptr, filename, NULL, NULL );
+    if ( av_open_check < 0 ) { // NOTE(Anton) the second param is `url` and we can try a web stream.
+      //char num_str[255];
+      //sprintf(num_str, "%d", av_open_check);
+      //_dbprint(num_str);
+      _dbprinterr( __LINE__, "Failed to open input file. (%d)\n", av_open_check );
       return false;
     }
     _dbprint( "format: %s, duration: %lld us, bit_rate: %lld\n", p->fmt_ctx_ptr->iformat->name, p->fmt_ctx_ptr->duration, p->fmt_ctx_ptr->bit_rate );
@@ -418,6 +423,7 @@ void vol_av_dimensions( const vol_av_video_t* info_ptr, int* w, int* h ) {
   vol_av_internal_t* p = info_ptr->_context_ptr;
   *w                   = p->codec_ctx_ptr->width;
   *h                   = p->codec_ctx_ptr->height;
+  _dbprint("%d x %d", w, h);
 }
 
 //
@@ -431,6 +437,7 @@ double vol_av_frame_rate( const vol_av_video_t* info_ptr ) {
   AVStream* v_strm     = p->fmt_ctx_ptr->streams[v_idx];
   AVRational avfr      = v_strm->avg_frame_rate;
   double frame_rate    = (double)avfr.num / (double)avfr.den;
+  _dbprint("frame rate: %f", frame_rate);
   return frame_rate;
 }
 
@@ -445,6 +452,7 @@ int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
   AVStream* v_strm     = p->fmt_ctx_ptr->streams[v_idx];
   // this variable is 0 if nb_frames "is not known" by libav
   int64_t n_frames = v_strm->nb_frames;
+  _dbprint("frame count (early): %lld", n_frames);
   if ( 0 != n_frames ) { return n_frames; }
 
   // if so i'll try to calculate it NB sir fred is 1799 (frames 1 to 1800) so i think i need a +1 here in calculations that would otherwise start at 0
@@ -453,6 +461,7 @@ int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
   if ( framerate_hz == 0.0 ) { return 0; }
   double seconds_per_frame = 1.0f / framerate_hz;
   n_frames                 = (int64_t)( duration_s / seconds_per_frame ) + 1;
+  _dbprint("frame count: %lld", n_frames);
   return n_frames;
 }
 
@@ -464,6 +473,7 @@ double vol_av_duration_s( const vol_av_video_t* info_ptr ) {
   vol_av_internal_t* p = info_ptr->_context_ptr;
   int64_t duration     = p->fmt_ctx_ptr->duration; // eg. output.mpg 5394000.  Duration: 00:00:59.93. in AV_TIME_BASE units.
   double duration_s    = duration / (double)AV_TIME_BASE;
+  _dbprint("movie duration: %f", duration_s);
   return duration_s;
 }
 
