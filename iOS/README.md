@@ -10,6 +10,15 @@ Since Xcode projects can only be built on Apple device, this guide assumes the u
 
 * **IMPORTANT**: Take note that the `src` folder is actually the [`shared/src`](/shared/src/) folder, and all files contained in this folder are used by all platforms. Changing these files will affect other platforms' projects.
 
+## FFMPEG
+
+The last thing needed is an ffmpeg build for iOS. (ffmpeg kit)[https://github.com/tanersener/ffmpeg-kit] is a handy repo for building ffmpeg on different platforms. 
+
+* Clone the repo 
+* Access the repo from the command line 
+* Run the command `./ios.sh --enable-ios-videotoolbox`
+* The output of the build will be `ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg` (this directory will be called **FFKIT_IOS_BUILD** in this guide)
+
 ## Build Settings
 * Access the **target** build settings
     * Click the `vol_unity_lib_ios` project in project navigator
@@ -30,10 +39,10 @@ The following build settings have a list of values:
 
 | Build Settings Key                    | Build Setting Values                            |
 | ------------------------------------- | ----------------------------------------------- |
-| `Search Paths > Header Search Paths`  | `"$(SRCROOT)/vol_unity_lib_ios/ffmpeg/include"` |
+| `Search Paths > Header Search Paths`  | `"{FFKIT_IOS_BUILD}/include"`                   |
 |                                       | `"$(SRCROOT)/../../shared/src"`                 |
 | `Search Paths > Library Search Paths` | `$(inherited)`                                  |
-|                                       | `$(PROJECT_DIR)/vol_unity_lib_ios/ffmpeg/lib`   |
+|                                       | `{FFKIT_IOS_BUILD}/lib`                         |
 
 All the entries for the `Search Paths` are **non-recursive**.
 
@@ -103,7 +112,7 @@ open $DEST_DIR
 ```
 
 * This will ensure that libs for both iOS devices and iOS simulators are built - it then combines these into a universal lib that can be used for both release and debug 
-* If everything is correct, then the files required by Unity are copied to the [`UnityVol` ](/UnityVol/) folder
+* If everything is correct, then the files required by Unity are copied to the [`UnityVol`](/UnityVol/) folder
 * This means that you have to do **2 builds**:
     * Before building make sure the build is using the `Release` build configuration. 
     * Edit the target's scheme by clicking the build target in the top toolbar and selecting `Edit Scheme`
