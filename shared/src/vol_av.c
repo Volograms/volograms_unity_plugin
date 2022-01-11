@@ -1,7 +1,7 @@
 /** @file vol_av.c
  * Volograms SDK Audio-Video Decoding API
  *
- * Version:   0.7 \n
+ * Version:   0.7.1 \n
  * Authors:   Anton Gerdelan <anton@volograms.com> \n
  * Copyright: 2021, Volograms (http://volograms.com/) \n
  * Language:  C99 \n
@@ -17,10 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef ANDROID_DEBUG
-#include <android/log.h>
-#endif
 
 /** To suppress compiler warnings. */
 #define VOL_AV_UNUSED( x ) (void)( x )
@@ -60,12 +56,6 @@ static void _dbprinterr( int line, const char* fmt, ... ) {
   va_start( args, fmt );
   vfprintf( stderr, fmt, args );
   va_end( args );
-#elif ANDROID_DEBUG
-  va_list args;
-  __android_log_print(ANDROID_LOG_ERROR, "VOL_LIB", "ERROR vol_av.c:%i ", line);
-  va_start( args, fmt );
-  __android_log_print(ANDROID_LOG_ERROR, "VOL_LIB", fmt, args);
-  va_end( args );
 #else
   VOL_AV_UNUSED( fmt );
   VOL_AV_UNUSED( line );
@@ -84,12 +74,6 @@ static void _dbprint( const char* fmt, ... ) {
   va_start( args, fmt );
   vfprintf( stdout, fmt, args );
   va_end( args );
-#elif ANDROID_DEBUG
-  va_list args;
-  __android_log_print(ANDROID_LOG_VERBOSE, "VOL_LIB", "vol_av: ");
-  va_start( args, fmt );
-  __android_log_print(ANDROID_LOG_VERBOSE, "VOL_LIB", fmt, args);
-  va_end( args );
 #else
   VOL_AV_UNUSED( fmt );
 #endif
@@ -102,7 +86,6 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
   if ( !filename || !info_ptr || info_ptr->_context_ptr != NULL ) { return false; }
 
   _dbprint( "opening URL `%s`...\n", filename );
-  _dbprint( filename );
 
   memset( info_ptr, 0, sizeof( vol_av_video_t ) );
   info_ptr->_context_ptr = calloc( 1, sizeof( vol_av_internal_t ) );
@@ -113,12 +96,8 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
   vol_av_internal_t* p = info_ptr->_context_ptr;
 
   { // Open the file and read its header. The codecs are not opened. -- note that if first param is NULL then this allocates memory.
-    int av_open_check = avformat_open_input( &p->fmt_ctx_ptr, filename, NULL, NULL );
-    if ( av_open_check < 0 ) { // NOTE(Anton) the second param is `url` and we can try a web stream.
-      //char num_str[255];
-      //sprintf(num_str, "%d", av_open_check);
-      //_dbprint(num_str);
-      _dbprinterr( __LINE__, "Failed to open input file. (%d)\n", av_open_check );
+    if ( avformat_open_input( &p->fmt_ctx_ptr, filename, NULL, NULL ) < 0 ) { // NOTE(Anton) the second param is `url` and we can try a web stream.
+      _dbprinterr( __LINE__, "Failed to open input file.\n" );
       return false;
     }
     _dbprint( "format: %s, duration: %lld us, bit_rate: %lld\n", p->fmt_ctx_ptr->iformat->name, p->fmt_ctx_ptr->duration, p->fmt_ctx_ptr->bit_rate );
@@ -207,7 +186,6 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
     p->output_frame_rgb_ptr->width  = p->codec_ctx_ptr->width;
     p->output_frame_rgb_ptr->height = p->codec_ctx_ptr->height;
 
-    // NOTE(Anton) This API is absolutely horrendous
     // The allocated image buffer has to be freed by using av_freep(&pointers[0]).
     int align = 32;                        // NOTE(Anton) I haven no idea if this is correct!!
     int ret   = av_image_alloc(            //
@@ -320,7 +298,7 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
   * This is IMO an error-prone error handling API design and lots of examples/tutorials misunderstand this and end up dropping the last few frames in a video.
   * A better video processing API would handle these states internally, not require the programmer to call 'read_frame' an unpredictable number of times in
   order to read a frame, and then loop over unknown numbers of packets that spit out unreliably.
-  * Bizarre! -- Anton.
+  * -- Anton.
   */
 
   // Supply raw packet data as input to a decoder
@@ -377,7 +355,7 @@ bool vol_av_read_next_frame( vol_av_video_t* info_ptr ) {
   // fill the Packet with data from the Stream
   // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga4fdb3084415a82e3810de6ee60e46a61
 
-  // Try a few times, in case there are dangling packets at the beginning or end of file to clean up. FFMpeg has an abysmal API design -- Anton.
+  // Try a few times, in case there are dangling packets at the beginning or end of file to clean up. -- Anton.
   for ( int i = 0; i < 8; i++ ) {
     if ( av_read_frame( p->fmt_ctx_ptr, packet_ptr ) >= 0 ) {
       // if it's the video stream
@@ -423,7 +401,6 @@ void vol_av_dimensions( const vol_av_video_t* info_ptr, int* w, int* h ) {
   vol_av_internal_t* p = info_ptr->_context_ptr;
   *w                   = p->codec_ctx_ptr->width;
   *h                   = p->codec_ctx_ptr->height;
-  _dbprint("%d x %d", w, h);
 }
 
 //
@@ -437,7 +414,6 @@ double vol_av_frame_rate( const vol_av_video_t* info_ptr ) {
   AVStream* v_strm     = p->fmt_ctx_ptr->streams[v_idx];
   AVRational avfr      = v_strm->avg_frame_rate;
   double frame_rate    = (double)avfr.num / (double)avfr.den;
-  _dbprint("frame rate: %f", frame_rate);
   return frame_rate;
 }
 
@@ -452,7 +428,6 @@ int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
   AVStream* v_strm     = p->fmt_ctx_ptr->streams[v_idx];
   // this variable is 0 if nb_frames "is not known" by libav
   int64_t n_frames = v_strm->nb_frames;
-  _dbprint("frame count (early): %lld", n_frames);
   if ( 0 != n_frames ) { return n_frames; }
 
   // if so i'll try to calculate it NB sir fred is 1799 (frames 1 to 1800) so i think i need a +1 here in calculations that would otherwise start at 0
@@ -461,7 +436,6 @@ int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
   if ( framerate_hz == 0.0 ) { return 0; }
   double seconds_per_frame = 1.0f / framerate_hz;
   n_frames                 = (int64_t)( duration_s / seconds_per_frame ) + 1;
-  _dbprint("frame count: %lld", n_frames);
   return n_frames;
 }
 
@@ -473,7 +447,6 @@ double vol_av_duration_s( const vol_av_video_t* info_ptr ) {
   vol_av_internal_t* p = info_ptr->_context_ptr;
   int64_t duration     = p->fmt_ctx_ptr->duration; // eg. output.mpg 5394000.  Duration: 00:00:59.93. in AV_TIME_BASE units.
   double duration_s    = duration / (double)AV_TIME_BASE;
-  _dbprint("movie duration: %f", duration_s);
   return duration_s;
 }
 

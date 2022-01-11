@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.6
+ * Version   | 0.6.1
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -219,57 +219,57 @@ static bool _read_vol_frame( const vol_geom_info_t* info_ptr, int frame_idx, vol
 
   {
     // start within the frame's memory but after its frame header and at the start of mesh data
-    vol_geom_size_t offset = 0;
+    vol_geom_size_t curr_offset = 0;
 
     { // vertices
-      if ( frame_data_ptr->block_data_sz < ( offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->vertices_sz ) ) { return false; }
+      if ( frame_data_ptr->block_data_sz < ( curr_offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->vertices_sz ) ) { return false; }
 
-      memcpy( &frame_data_ptr->vertices_sz, &frame_data_ptr->block_data_ptr[offset], sizeof( int32_t ) );
-      offset += sizeof( int32_t );
-      frame_data_ptr->vertices_offset = offset;
-      offset += (vol_geom_size_t)frame_data_ptr->vertices_sz;
+      memcpy( &frame_data_ptr->vertices_sz, &frame_data_ptr->block_data_ptr[curr_offset], sizeof( int32_t ) );
+      curr_offset += sizeof( int32_t );
+      frame_data_ptr->vertices_offset = curr_offset;
+      curr_offset += (vol_geom_size_t)frame_data_ptr->vertices_sz;
     }
 
     // normals
     if ( info_ptr->hdr.normals && info_ptr->hdr.version >= 11 ) {
-      if ( frame_data_ptr->block_data_sz < ( offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->normals_sz ) ) { return false; }
+      if ( frame_data_ptr->block_data_sz < ( curr_offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->normals_sz ) ) { return false; }
 
-      memcpy( &frame_data_ptr->normals_sz, &frame_data_ptr->block_data_ptr[offset], sizeof( int32_t ) );
-      offset += sizeof( int32_t );
-      frame_data_ptr->normals_offset = offset;
-      offset += (vol_geom_size_t)frame_data_ptr->normals_sz;
+      memcpy( &frame_data_ptr->normals_sz, &frame_data_ptr->block_data_ptr[curr_offset], sizeof( int32_t ) );
+      curr_offset += sizeof( int32_t );
+      frame_data_ptr->normals_offset = curr_offset;
+      curr_offset += (vol_geom_size_t)frame_data_ptr->normals_sz;
     }
 
     // indices and UVs
     if ( info_ptr->frame_headers_ptr[frame_idx].keyframe == 1 || ( info_ptr->hdr.version >= 12 && info_ptr->frame_headers_ptr[frame_idx].keyframe == 2 ) ) {
       { // indices
-        if ( frame_data_ptr->block_data_sz < ( offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->indices_sz ) ) { return false; }
+        if ( frame_data_ptr->block_data_sz < ( curr_offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->indices_sz ) ) { return false; }
 
-        memcpy( &frame_data_ptr->indices_sz, &frame_data_ptr->block_data_ptr[offset], sizeof( int32_t ) );
-        offset += sizeof( int32_t );
-        frame_data_ptr->indices_offset = offset;
-        offset += (vol_geom_size_t)frame_data_ptr->indices_sz;
+        memcpy( &frame_data_ptr->indices_sz, &frame_data_ptr->block_data_ptr[curr_offset], sizeof( int32_t ) );
+        curr_offset += sizeof( int32_t );
+        frame_data_ptr->indices_offset = curr_offset;
+        curr_offset += (vol_geom_size_t)frame_data_ptr->indices_sz;
       }
 
       { // UVs
-        if ( frame_data_ptr->block_data_sz < ( offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->uvs_sz ) ) { return false; }
+        if ( frame_data_ptr->block_data_sz < ( curr_offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->uvs_sz ) ) { return false; }
 
-        memcpy( &frame_data_ptr->uvs_sz, &frame_data_ptr->block_data_ptr[offset], sizeof( int32_t ) );
-        offset += sizeof( int32_t );
-        frame_data_ptr->uvs_offset = offset;
-        offset += (vol_geom_size_t)frame_data_ptr->uvs_sz;
+        memcpy( &frame_data_ptr->uvs_sz, &frame_data_ptr->block_data_ptr[curr_offset], sizeof( int32_t ) );
+        curr_offset += sizeof( int32_t );
+        frame_data_ptr->uvs_offset = curr_offset;
+        curr_offset += (vol_geom_size_t)frame_data_ptr->uvs_sz;
       }
     } // endif indices & UVs
 
     // texture
     // NOTE(Anton) not tested since we aren't using embedded textures at the moment.
     if ( info_ptr->hdr.version >= 11 && info_ptr->hdr.textured ) {
-      if ( frame_data_ptr->block_data_sz < ( offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->texture_sz ) ) { return false; }
+      if ( frame_data_ptr->block_data_sz < ( curr_offset + sizeof( int32_t ) + (vol_geom_size_t)frame_data_ptr->texture_sz ) ) { return false; }
 
-      memcpy( &frame_data_ptr->texture_sz, &frame_data_ptr->block_data_ptr[offset], sizeof( int32_t ) );
-      offset += sizeof( int32_t );
-      frame_data_ptr->texture_offset = offset;
-      offset += (vol_geom_size_t)frame_data_ptr->texture_sz;
+      memcpy( &frame_data_ptr->texture_sz, &frame_data_ptr->block_data_ptr[curr_offset], sizeof( int32_t ) );
+      curr_offset += sizeof( int32_t );
+      frame_data_ptr->texture_offset = curr_offset;
+      curr_offset += (vol_geom_size_t)frame_data_ptr->texture_sz;
     }
   } // endread data sections
 
@@ -375,10 +375,19 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
 
   // find out the size and offset of every frame
   { // fetch frame from sequence file
+    vol_geom_size_t sequence_file_sz = 0;
+
     f_ptr = fopen( seq_filename, "rb" );
     if ( !f_ptr ) {
       _dbprinterr( __LINE__, "ERROR: Could not open file `%s`\n", seq_filename );
       goto failed_to_read_info;
+    }
+
+    { // get file size to do sanity test of other sizes with
+      if ( 0 != fseek( f_ptr, 0L, SEEK_END ) ) { goto failed_to_read_info; }
+      sequence_file_sz = (vol_geom_size_t)ftell( f_ptr );
+      _dbprint( "Sequence file is %u bytes\n", (uint32_t)sequence_file_sz );
+      if ( 0 != fseek( f_ptr, 0L, SEEK_SET ) ) { goto failed_to_read_info; }
     }
 
     // loop to get each frame's details
@@ -397,6 +406,10 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
       }
       if ( !fread( &frame_hdr.mesh_data_sz, sizeof( int32_t ), 1, f_ptr ) ) {
         _dbprinterr( __LINE__, "ERROR: mesh_data_sz %i was out of file size range in sequence file\n", frame_hdr.mesh_data_sz );
+        goto failed_to_read_info;
+      }
+      if ( frame_hdr.mesh_data_sz < 0 || (vol_geom_size_t)frame_hdr.mesh_data_sz > sequence_file_sz ) {
+        _dbprinterr( __LINE__, "ERROR: mesh_data_sz %i was invalid for a sequence of %u bytes\n", frame_hdr.mesh_data_sz, (uint32_t)sequence_file_sz );
         goto failed_to_read_info;
       }
       if ( !fread( &frame_hdr.keyframe, sizeof( uint8_t ), 1, f_ptr ) ) {
@@ -422,6 +435,11 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
           }
         }
       }
+      if ( info_ptr->frames_directory_ptr[i].corrected_payload_sz > sequence_file_sz ) {
+        _dbprinterr( __LINE__, "ERROR: frame %i corrected_payload_sz %i bytes was too large for a sequence of %u bytes\n", i,
+          info_ptr->frames_directory_ptr[i].corrected_payload_sz, (uint32_t)sequence_file_sz );
+        goto failed_to_read_info;
+      }
 
       // seek past mesh data and past the final integer "frame data size". see if file is big enough
       if ( -1 == fseek( f_ptr, (long)info_ptr->frames_directory_ptr[i].corrected_payload_sz + 4, SEEK_CUR ) ) {
@@ -434,6 +452,11 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
       info_ptr->frames_directory_ptr[i].offset_sz = (vol_geom_size_t)frame_start_offset;
       info_ptr->frames_directory_ptr[i].total_sz  = (vol_geom_size_t)frame_current_offset - (vol_geom_size_t)frame_start_offset;
       info_ptr->frame_headers_ptr[i]              = frame_hdr;
+      if ( info_ptr->frames_directory_ptr[i].total_sz > sequence_file_sz ) {
+        _dbprinterr( __LINE__, "ERROR: frame %i total_sz %i bytes was too large for a sequence of %u bytes\n", i, info_ptr->frames_directory_ptr[i].total_sz,
+          (uint32_t)sequence_file_sz );
+        goto failed_to_read_info;
+      }
 
       if ( info_ptr->frames_directory_ptr[i].total_sz > info_ptr->biggest_frame_blob_sz ) {
         info_ptr->biggest_frame_blob_sz = info_ptr->frames_directory_ptr[i].total_sz;

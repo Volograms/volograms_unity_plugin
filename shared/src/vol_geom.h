@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.6
+ * Version   | 0.6.1
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -21,6 +21,7 @@
  *
  * History
  * -------
+ * - 0.6.1 (2021/11/25) - Patched 0.6 to add file memory size validation vulnerabilities reported by fuzzer.
  * - 0.6   (2021/11/24) - Better memory allocation and management - improved performance & simpler API should reduce risk of accidental memory leaks.
  * - 0.5   (2021/11/15) - Better platform consistency with specified byte-size type.
  * - 0.4   (2021/10/15) - Updated licence and copyright information.

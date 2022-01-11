@@ -3,13 +3,13 @@
  *
  * vol_av    | Audio-Video Decoding API
  * --------- | ----------
- * Version   | 0.7
+ * Version   | 0.7.1
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
  * Files     | 2
  * Licence   | The MIT License. See LICENSE.md for details.
- * Notes     | Internally this uses FFMPEG to stream audio/video from a webm file or other media.
+ * Notes     | Internally this uses FFmpeg to stream audio/video from a webm file or other media.
  *
  * Current Limitations
  * -----------
@@ -20,15 +20,16 @@
  *
  * References
  * -----------
- * - The best libav/ffmpeg implementation reference material is this tutorial series: https://github.com/mpenkov/ffmpeg-tutorial
+ * - A decent libav/ffmpeg implementation reference material is this tutorial series: https://github.com/mpenkov/ffmpeg-tutorial
  *
  * History
  * -----------
+ * - 0.7.1 (2021/12/10) - Tidied comments.
  * - 0.7   (2021/10/15) - Updated copyright and licence notice.
  * - 0.6   (2021/09/17) - Fixes to memory leaks and delete-after-free found in testing and fuzzing.
  * - 0.5   (2021/09/02) - Fixed a memory leak when a file failed to load and vol_av_open() returned false.
  * - 0.4   (2021/08/23) - Tidied comments for Doxygen. Put experimental `seek` functionality behind a macro.
- * - 0.2   (2021/06/04) - Update to use latest FFMPEG API.
+ * - 0.2   (2021/06/04) - Update to use latest FFmpeg API.
  * - 0.1   (2021/05/26) - First version with number and repo.
  */
 
@@ -113,17 +114,17 @@ VOL_AV_EXPORT double vol_av_duration_s( const vol_av_video_t* info_ptr );
 * @return          False on error or end of file.
 * EXAMPLE:
 *
-  while ( next_frame > frame ) {
-    if ( !codec_read_next_frame( &video_info ) ) {
-      printf( "frames end\n" );
-      break;
-    }
-    frame++;
-    if ( next_frame == frame ) {
-      // where this function copies bytes of an RGB 3-channel image into an engine-appropriate texture
-      gfx_update_texture( &texture, video_info.pixels_ptr, video_info.info_ptr->width, video_info.info_ptr->height, 3 );
-    }
+while ( next_frame > frame ) {
+  if ( !codec_read_next_frame( &video_info ) ) {
+    printf( "frames end\n" );
+    break;
   }
+  frame++;
+  if ( next_frame == frame ) {
+    // where this function copies bytes of an RGB 3-channel image into an engine-appropriate texture
+    gfx_update_texture( &texture, video_info.pixels_ptr, video_info.info_ptr->width, video_info.info_ptr->height, 3 );
+  }
+}
 */
 VOL_AV_EXPORT bool vol_av_read_next_frame( vol_av_video_t* info_ptr );
 
