@@ -1,0 +1,419 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 50;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		871FC0DB26B2AE09002D6F50 /* vol_geom.c in Sources */ = {isa = PBXBuildFile; fileRef = 871FC0D926B2AE09002D6F50 /* vol_geom.c */; };
+		87AC777826AEC29100E2F9E1 /* vol_av.c in Sources */ = {isa = PBXBuildFile; fileRef = 87AC76D726AEC29100E2F9E1 /* vol_av.c */; };
+		CDA24C90278DA0CB00B646E9 /* vol_interface.c in Sources */ = {isa = PBXBuildFile; fileRef = CDA24C8F278DA0CB00B646E9 /* vol_interface.c */; };
+		CDA24CAA278DA5F500B646E9 /* libavcodec.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CA2278DA5F500B646E9 /* libavcodec.dylib */; };
+		CDA24CAB278DA5F500B646E9 /* libavdevice.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CA3278DA5F500B646E9 /* libavdevice.dylib */; };
+		CDA24CAC278DA5F500B646E9 /* libswresample.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CA4278DA5F500B646E9 /* libswresample.dylib */; };
+		CDA24CAE278DA5F500B646E9 /* libavresample.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CA6278DA5F500B646E9 /* libavresample.dylib */; };
+		CDA24CAF278DA5F500B646E9 /* libavfilter.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CA7278DA5F500B646E9 /* libavfilter.dylib */; };
+		CDA24CB0278DA5F500B646E9 /* libavutil.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CA8278DA5F500B646E9 /* libavutil.dylib */; };
+		CDA24CB1278DA5F500B646E9 /* libavformat.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CA9278DA5F500B646E9 /* libavformat.dylib */; };
+		CDA24CC5278DA7A000B646E9 /* libswscale.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CDA24CC4278DA7A000B646E9 /* libswscale.dylib */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		87B0262526B01B38009EB37C /* Embed Libraries */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Libraries";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		871FC0D926B2AE09002D6F50 /* vol_geom.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vol_geom.c; sourceTree = "<group>"; };
+		871FC0DA26B2AE09002D6F50 /* vol_geom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vol_geom.h; sourceTree = "<group>"; };
+		87AC76D626AEC29100E2F9E1 /* vol_av.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vol_av.h; sourceTree = "<group>"; };
+		87AC76D726AEC29100E2F9E1 /* vol_av.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vol_av.c; sourceTree = "<group>"; };
+		87CA4E7426A86BA000901D4F /* vol_unity_macos.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = vol_unity_macos.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
+		87CA4E7726A86BA000901D4F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CDA24C8F278DA0CB00B646E9 /* vol_interface.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vol_interface.c; sourceTree = "<group>"; };
+		CDA24CA2278DA5F500B646E9 /* libavcodec.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavcodec.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libavcodec.dylib; sourceTree = "<group>"; };
+		CDA24CA3278DA5F500B646E9 /* libavdevice.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavdevice.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libavdevice.dylib; sourceTree = "<group>"; };
+		CDA24CA4278DA5F500B646E9 /* libswresample.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libswresample.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libswresample.dylib; sourceTree = "<group>"; };
+		CDA24CA6278DA5F500B646E9 /* libavresample.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavresample.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libavresample.dylib; sourceTree = "<group>"; };
+		CDA24CA7278DA5F500B646E9 /* libavfilter.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavfilter.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libavfilter.dylib; sourceTree = "<group>"; };
+		CDA24CA8278DA5F500B646E9 /* libavutil.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavutil.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libavutil.dylib; sourceTree = "<group>"; };
+		CDA24CA9278DA5F500B646E9 /* libavformat.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libavformat.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libavformat.dylib; sourceTree = "<group>"; };
+		CDA24CC4278DA7A000B646E9 /* libswscale.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libswscale.dylib; path = ../../../../../../../usr/local/Cellar/ffmpeg/4.4_2/lib/libswscale.dylib; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		87CA4E7126A86BA000901D4F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CDA24CC5278DA7A000B646E9 /* libswscale.dylib in Frameworks */,
+				CDA24CAA278DA5F500B646E9 /* libavcodec.dylib in Frameworks */,
+				CDA24CB1278DA5F500B646E9 /* libavformat.dylib in Frameworks */,
+				CDA24CB0278DA5F500B646E9 /* libavutil.dylib in Frameworks */,
+				CDA24CAB278DA5F500B646E9 /* libavdevice.dylib in Frameworks */,
+				CDA24CAC278DA5F500B646E9 /* libswresample.dylib in Frameworks */,
+				CDA24CAE278DA5F500B646E9 /* libavresample.dylib in Frameworks */,
+				CDA24CAF278DA5F500B646E9 /* libavfilter.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		87AC747B26AEAD5200E2F9E1 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				CDA24C8F278DA0CB00B646E9 /* vol_interface.c */,
+				87AC76D726AEC29100E2F9E1 /* vol_av.c */,
+				87AC76D626AEC29100E2F9E1 /* vol_av.h */,
+				871FC0D926B2AE09002D6F50 /* vol_geom.c */,
+				871FC0DA26B2AE09002D6F50 /* vol_geom.h */,
+			);
+			name = src;
+			path = ../../shared/src;
+			sourceTree = "<group>";
+		};
+		87AC7D1626AF0D9F00E2F9E1 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				CDA24CA2278DA5F500B646E9 /* libavcodec.dylib */,
+				CDA24CA3278DA5F500B646E9 /* libavdevice.dylib */,
+				CDA24CA7278DA5F500B646E9 /* libavfilter.dylib */,
+				CDA24CA9278DA5F500B646E9 /* libavformat.dylib */,
+				CDA24CA6278DA5F500B646E9 /* libavresample.dylib */,
+				CDA24CA8278DA5F500B646E9 /* libavutil.dylib */,
+				CDA24CA4278DA5F500B646E9 /* libswresample.dylib */,
+				CDA24CC4278DA7A000B646E9 /* libswscale.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		87CA4E6B26A86B9F00901D4F = {
+			isa = PBXGroup;
+			children = (
+				87AC747B26AEAD5200E2F9E1 /* src */,
+				87CA4E7626A86BA000901D4F /* UnityPlugin */,
+				87CA4E7526A86BA000901D4F /* Products */,
+				87AC7D1626AF0D9F00E2F9E1 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		87CA4E7526A86BA000901D4F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				87CA4E7426A86BA000901D4F /* vol_unity_macos.bundle */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		87CA4E7626A86BA000901D4F /* UnityPlugin */ = {
+			isa = PBXGroup;
+			children = (
+				87CA4E7726A86BA000901D4F /* Info.plist */,
+			);
+			path = UnityPlugin;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		87CA4E7326A86BA000901D4F /* vol_unity_macos */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 87CA4E7A26A86BA000901D4F /* Build configuration list for PBXNativeTarget "vol_unity_macos" */;
+			buildPhases = (
+				87CA4E7026A86BA000901D4F /* Sources */,
+				87CA4E7126A86BA000901D4F /* Frameworks */,
+				87CA4E7226A86BA000901D4F /* Resources */,
+				87B0262526B01B38009EB37C /* Embed Libraries */,
+				87D7447826BAA1D200CB34BF /* ShellScript */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = vol_unity_macos;
+			productName = UnityPlugin;
+			productReference = 87CA4E7426A86BA000901D4F /* vol_unity_macos.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		87CA4E6C26A86B9F00901D4F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1250;
+				TargetAttributes = {
+					87CA4E7326A86BA000901D4F = {
+						CreatedOnToolsVersion = 12.5.1;
+					};
+				};
+			};
+			buildConfigurationList = 87CA4E6F26A86B9F00901D4F /* Build configuration list for PBXProject "vol_unity_macos" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 87CA4E6B26A86B9F00901D4F;
+			productRefGroup = 87CA4E7526A86BA000901D4F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				87CA4E7326A86BA000901D4F /* vol_unity_macos */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		87CA4E7226A86BA000901D4F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		87D7447826BAA1D200CB34BF /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "PRODUCT=\"${BUILT_PRODUCTS_DIR}/${TARGET_NAME}.bundle\"\nmkdir -p \"${PROJECT_DIR}/../../UnityVol/Plugins/OSX/\"\ncp -r -f \"${PRODUCT}\" \"${PROJECT_DIR}/../../UnityVol/Plugins/OSX/\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		87CA4E7026A86BA000901D4F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				871FC0DB26B2AE09002D6F50 /* vol_geom.c in Sources */,
+				87AC777826AEC29100E2F9E1 /* vol_av.c in Sources */,
+				CDA24C90278DA0CB00B646E9 /* vol_interface.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		87CA4E7826A86BA000901D4F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.3;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		87CA4E7926A86BA000901D4F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.3;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		87CA4E7B26A86BA000901D4F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/Cellar/ffmpeg/4.4_2/include,
+					/Applications/Unity/Hub/Editor/2020.3.21f1/Unity.app/Contents/PluginAPI,
+				);
+				INFOPLIST_FILE = UnityPlugin/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/ffmpeg/4.4_2/lib,
+				);
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = Volograms.UnityPlugin;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SYSTEM_HEADER_SEARCH_PATHS = "";
+				USER_HEADER_SEARCH_PATHS = "";
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Debug;
+		};
+		87CA4E7C26A86BA000901D4F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/Cellar/ffmpeg/4.4_2/include,
+					/Applications/Unity/Hub/Editor/2020.3.21f1/Unity.app/Contents/PluginAPI,
+				);
+				INFOPLIST_FILE = UnityPlugin/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/ffmpeg/4.4_2/lib,
+				);
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = Volograms.UnityPlugin;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SYSTEM_HEADER_SEARCH_PATHS = "";
+				USER_HEADER_SEARCH_PATHS = "";
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		87CA4E6F26A86B9F00901D4F /* Build configuration list for PBXProject "vol_unity_macos" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				87CA4E7826A86BA000901D4F /* Debug */,
+				87CA4E7926A86BA000901D4F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		87CA4E7A26A86BA000901D4F /* Build configuration list for PBXNativeTarget "vol_unity_macos" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				87CA4E7B26A86BA000901D4F /* Debug */,
+				87CA4E7C26A86BA000901D4F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 87CA4E6C26A86B9F00901D4F /* Project object */;
+}
