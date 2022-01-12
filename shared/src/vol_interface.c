@@ -204,7 +204,6 @@ static int vid_frm_size = -1;
  */
 DllExport bool native_vol_open_video_file(const char* filename)
 {
-    callbackInstance(filename, 0, strlen(filename));
     memset( &video_file_ptr, 0, sizeof(vol_av_video_t));
     bool ret = vol_av_open(filename, &video_file_ptr);
     
