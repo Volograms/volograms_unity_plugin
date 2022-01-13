@@ -159,7 +159,6 @@
 				879399C726BC16FD0023C8DE /* Sources */,
 				879399C826BC16FD0023C8DE /* Frameworks */,
 				879399C926BC16FD0023C8DE /* CopyFiles */,
-				87B974B326C1234E00DDD1CC /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -200,26 +199,6 @@
 			);
 		};
 /* End PBXProject section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		87B974B326C1234E00DDD1CC /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# Where Xcode puts the built libraries\nPRODUCT_BASE_DIR=\"${BUILT_PRODUCTS_DIR}/..\"\n# Location of the iOS lib\nIOS_PRODUCT=\"${PRODUCT_BASE_DIR}/Release-iphoneos/lib${TARGET_NAME}.a\"\n# Location of the Simulator lib\nSIM_PRODUCT=\"${PRODUCT_BASE_DIR}/Release-iphonesimulator/lib${TARGET_NAME}.a\"\n# Where we want the final lib to go\nDEST_DIR=\"${PROJECT_DIR}/../../UnityVol/Plugins/iOS/\"\n# Log file indicating is something is missing\nLOG_FILE=\"${DEST_DIR}/readme.txt\"\n\necho \"${LOG_FILE}\"\n\n# Create dest dir if it does not exist \nmkdir -p ${DEST_DIR}\n\nif [[ -f $IOS_PRODUCT ]]; then \n    if [[ -f $SIM_PRODUCT ]]; then \n        # Remove log file, not needed\n        rm -f -- $LOG_FILE\n        # Combine the iOS and Simulator libraries into one, so it will work on both\n        # actual devices and simulators \n        lipo -create $IOS_PRODUCT $SIM_PRODUCT -output \"${PRODUCT_BASE_DIR}/libVolAv.a\"\n        # Copy universal lib into dest for easy transfer to Unity\n        cp -r -f \"${PRODUCT_BASE_DIR}/libVolAv.a\" \"${DEST_DIR}\"\n        # We also need to copy over the header files\n        cp -r -f \"${BUILT_PRODUCTS_DIR}/include\" \"${DEST_DIR}\"\n    else \n        # Print log file with some helpful text\n        echo \"Both iOS product and Simulator products are required.\" > $LOG_FILE\n        echo \"Simulator product does not exist. Build with simulator target.\" >> $LOG_FILE\n        echo \"In Xcode, in the top toolbar, set the build target to something\" >> $LOG_FILE\n        echo \"like 'iPad (8th Generation)' under 'iOS Simulators', then build.\" >> $LOG_FILE\n        open -e LOG_FILE\n    fi\nelse \n    # Print log file with some helpful text\n    echo \"Both iOS product and Simulator products are required.\" > $LOG_FILE\n    echo \"iOS product does not exist. Build with iOS target.\" >> $LOG_FILE\n    echo \"In Xcode, in the top toolbar, set the build target to\" >> $LOG_FILE\n    echo \"'Any iOS Device (arm64)' under 'Build', then build.\" >> $LOG_FILE\n    open -e LOG_FILE\nfi\n\n# Open the dest folder in Finder\nopen $DEST_DIR\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		879399C726BC16FD0023C8DE /* Sources */ = {
