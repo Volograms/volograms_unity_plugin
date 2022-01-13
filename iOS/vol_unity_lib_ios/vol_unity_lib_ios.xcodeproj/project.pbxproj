@@ -21,6 +21,13 @@
 		87B7977726BD8D90003B51F1 /* libiconv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 87B7977626BD8D90003B51F1 /* libiconv.tbd */; platformFilter = ios; };
 		87B7977926BD8D9A003B51F1 /* libbz2.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 87B7977826BD8D9A003B51F1 /* libbz2.tbd */; platformFilter = ios; };
 		CDA24C8D278C954100B646E9 /* vol_interface.c in Sources */ = {isa = PBXBuildFile; fileRef = CDA24C8C278C954100B646E9 /* vol_interface.c */; };
+		CDD310452790356400856B1F /* libavutil.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD3103E2790356400856B1F /* libavutil.a */; };
+		CDD310462790356400856B1F /* libavfilter.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD3103F2790356400856B1F /* libavfilter.a */; };
+		CDD310472790356500856B1F /* libavformat.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD310402790356400856B1F /* libavformat.a */; };
+		CDD310482790356500856B1F /* libavdevice.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD310412790356400856B1F /* libavdevice.a */; };
+		CDD310492790356500856B1F /* libswscale.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD310422790356400856B1F /* libswscale.a */; };
+		CDD3104A2790356500856B1F /* libswresample.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD310432790356400856B1F /* libswresample.a */; };
+		CDD3104B2790356500856B1F /* libavcodec.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CDD310442790356400856B1F /* libavcodec.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,6 +60,13 @@
 		87B7977626BD8D90003B51F1 /* libiconv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libiconv.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.3.sdk/usr/lib/libiconv.tbd; sourceTree = DEVELOPER_DIR; };
 		87B7977826BD8D9A003B51F1 /* libbz2.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.3.sdk/usr/lib/libbz2.tbd; sourceTree = DEVELOPER_DIR; };
 		CDA24C8C278C954100B646E9 /* vol_interface.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vol_interface.c; sourceTree = "<group>"; };
+		CDD3103E2790356400856B1F /* libavutil.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavutil.a; path = "../../../../ThirdParty/ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg/lib/libavutil.a"; sourceTree = "<group>"; };
+		CDD3103F2790356400856B1F /* libavfilter.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavfilter.a; path = "../../../../ThirdParty/ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg/lib/libavfilter.a"; sourceTree = "<group>"; };
+		CDD310402790356400856B1F /* libavformat.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavformat.a; path = "../../../../ThirdParty/ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg/lib/libavformat.a"; sourceTree = "<group>"; };
+		CDD310412790356400856B1F /* libavdevice.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavdevice.a; path = "../../../../ThirdParty/ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg/lib/libavdevice.a"; sourceTree = "<group>"; };
+		CDD310422790356400856B1F /* libswscale.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libswscale.a; path = "../../../../ThirdParty/ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg/lib/libswscale.a"; sourceTree = "<group>"; };
+		CDD310432790356400856B1F /* libswresample.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libswresample.a; path = "../../../../ThirdParty/ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg/lib/libswresample.a"; sourceTree = "<group>"; };
+		CDD310442790356400856B1F /* libavcodec.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavcodec.a; path = "../../../../ThirdParty/ffmpeg-kit/prebuilt/bundle-apple-universal-ios/ffmpeg/lib/libavcodec.a"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,14 +74,21 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CDD310452790356400856B1F /* libavutil.a in Frameworks */,
+				CDD3104A2790356500856B1F /* libswresample.a in Frameworks */,
 				87B7977926BD8D9A003B51F1 /* libbz2.tbd in Frameworks */,
 				87B7977726BD8D90003B51F1 /* libiconv.tbd in Frameworks */,
+				CDD310472790356500856B1F /* libavformat.a in Frameworks */,
 				87B7977526BD8D7F003B51F1 /* libz.tbd in Frameworks */,
 				87B7977326BD8D74003B51F1 /* CoreVideo.framework in Frameworks */,
+				CDD3104B2790356500856B1F /* libavcodec.a in Frameworks */,
 				87B7977126BD8D67003B51F1 /* VideoToolbox.framework in Frameworks */,
 				87B7976F26BD8D5A003B51F1 /* AudioToolbox.framework in Frameworks */,
+				CDD310492790356500856B1F /* libswscale.a in Frameworks */,
 				87B7976D26BD8D4F003B51F1 /* CoreFoundation.framework in Frameworks */,
 				87B7976B26BD8D45003B51F1 /* CoreMedia.framework in Frameworks */,
+				CDD310462790356400856B1F /* libavfilter.a in Frameworks */,
+				CDD310482790356500856B1F /* libavdevice.a in Frameworks */,
 				87B7976926BD8D3A003B51F1 /* Security.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -117,6 +138,13 @@
 				87B7976C26BD8D4F003B51F1 /* CoreFoundation.framework */,
 				87B7976A26BD8D45003B51F1 /* CoreMedia.framework */,
 				87B7976826BD8D3A003B51F1 /* Security.framework */,
+				CDD310442790356400856B1F /* libavcodec.a */,
+				CDD310412790356400856B1F /* libavdevice.a */,
+				CDD3103F2790356400856B1F /* libavfilter.a */,
+				CDD310402790356400856B1F /* libavformat.a */,
+				CDD3103E2790356400856B1F /* libavutil.a */,
+				CDD310432790356400856B1F /* libswresample.a */,
+				CDD310422790356400856B1F /* libswscale.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
