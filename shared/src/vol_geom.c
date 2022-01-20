@@ -18,48 +18,30 @@
 #include <stdio.h>
 #include <string.h>
 
+#define VOL_GEOM_LOG_STR_MAX_LEN 512 // Careful - this is stored on the stack to be thread and memory-safe so don't make it too large.
 /// File header section size in bytes. Used in sanity checks to test for corrupted files that are below minimum sizes expected.
 #define VOL_GEOM_FILE_HDR_V10_MIN_SZ 24 /// "VOLS" (4 bytes) + 4 string length bytes + 4 ints in v10 hdr.
 /// File header section size in bytes. Used in sanity checks to test for corrupted files that are below minimum sizes expected.
 #define VOL_GEOM_FRAME_MIN_SZ 17 /// 3 ints, 1 byte, 1 int inside vertices array. the rest are optional
 
-/** To suppress compiler warnings. */
-#define VOL_GEOM_UNUSED( x ) (void)( x )
-
-/** Printf an error message to stderr, but only if VOL_GEOM_DEBUG is set.
- * @param line   Use `__LINE__` here to print the line number of the error message.
- * @param fmt    A formatted string in `printf()` variable-argument, (supporting `%%i`, `%%f` etc.). \n
- * Example:      `_dbprinterr(__LINE__, "testing thing %i\n", 10 );` \n
- * That will output: `ERROR vol_av.c:64 testing thing 10`
- */
-static void _dbprinterr( int line, const char* fmt, ... ) {
-#ifdef VOL_GEOM_DEBUG
-  va_list args;
-  fprintf( stderr, "ERROR vol_geom.c:%i ", line );
-  va_start( args, fmt );
-  vfprintf( stderr, fmt, args );
-  va_end( args );
-#else
-  VOL_GEOM_UNUSED( fmt );
-  VOL_GEOM_UNUSED( line );
-#endif
+static void _default_logger( vol_geom_log_type_t log_type, const char* message_str, int len ) {
+  FILE* stream_ptr = ( VOL_GEOM_LOG_TYPE_ERROR == log_type || VOL_GEOM_LOG_TYPE_WARNING == log_type ) ? stderr : stdout;
+  (void)len; // Unused here.
+  fprintf( stream_ptr, "%s", message_str );
 }
 
-/** Printf an error message to stdout, but only if `VOL_GEOM_DEBUG` is set.
- * @param fmt    A formatted string in `printf()` variable-argument, (supporting `%%i`, `%%f` etc.). \n
- * Example:      `_dbprint("testing thing %i\n", 10 );` \n
- * That will output: `vol_geom: testing thing 10`
- */
-static void _dbprint( const char* fmt, ... ) {
-#ifdef VOL_GEOM_DEBUG
-  va_list args;
-  fprintf( stdout, "vol_geom: " );
-  va_start( args, fmt );
-  vfprintf( stdout, fmt, args );
-  va_end( args );
-#else
-  VOL_GEOM_UNUSED( fmt );
-#endif
+static void ( *_logger_ptr )( vol_geom_log_type_t log_type, const char* message_str, int message_len ) = &_default_logger;
+
+// This function is used in this file as a printf-style logger. It converts that format to a simple string and passes it to _logger_ptr.
+static void _vol_loggerf( vol_geom_log_type_t log_type, const char* message_str, ... ) {
+  char log_str[VOL_GEOM_LOG_STR_MAX_LEN];
+  log_str[0] = '\0';
+  va_list arg_ptr; // using va_args lets us make sure any printf-style formatting values are properly written into the string.
+  va_start( arg_ptr, message_str );
+  vsnprintf( log_str, VOL_GEOM_LOG_STR_MAX_LEN - 1, message_str, arg_ptr );
+  va_end( arg_ptr );
+  int len = strlen( log_str );
+  _logger_ptr( log_type, log_str, len );
 }
 
 /// Helper struct to refer to an entire file loaded from disk via `_read_entire_file()`.
@@ -87,7 +69,7 @@ static bool _read_entire_file( const char* filename, vol_geom_file_record_t* fr_
   if ( !f_ptr ) { return false; }
   fseek( f_ptr, 0L, SEEK_END );
   fr_ptr->sz = (vol_geom_size_t)ftell( f_ptr );
-  _dbprint( "Allocating %u bytes for reading file\n", (uint32_t)fr_ptr->sz );
+  _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Allocating %u bytes for reading file\n", (uint32_t)fr_ptr->sz );
   fr_ptr->byte_ptr = malloc( (size_t)fr_ptr->sz );
   if ( !fr_ptr->byte_ptr ) {
     fclose( f_ptr );
@@ -133,7 +115,7 @@ static bool _read_short_str( const vol_geom_file_record_t* fr_ptr, vol_geom_size
 
   sstr->sz = fr_ptr->byte_ptr[offset]; // assumes the 1-byte length
   if ( sstr->sz > 127 ) {
-    _dbprinterr( __LINE__, "ERROR: string length %i given is > 127\n", (int)sstr->sz );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: string length %i given is > 127\n", (int)sstr->sz );
     return false;
   }
   if ( offset + sstr->sz >= fr_ptr->sz ) { return false; } // OOB
@@ -281,7 +263,7 @@ bool vol_geom_read_frame( const char* seq_filename, const vol_geom_info_t* info_
   if ( !seq_filename || !info_ptr || !frame_data_ptr ) { return false; }
 
   if ( frame_idx < 0 || frame_idx >= info_ptr->hdr.frame_count ) {
-    _dbprinterr( __LINE__, "ERROR: frame requested (%i) is not in valid range of 0-%i for sequence\n", frame_idx, info_ptr->hdr.frame_count );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: frame requested (%i) is not in valid range of 0-%i for sequence\n", frame_idx, info_ptr->hdr.frame_count );
     return false;
   }
 
@@ -292,32 +274,32 @@ bool vol_geom_read_frame( const char* seq_filename, const vol_geom_info_t* info_
   // Get file size and check for file size issues before allocating memory or reading
   vol_geom_size_t file_sz = 0;
   if ( !_get_file_sz( seq_filename, &file_sz ) ) {
-    _dbprinterr( __LINE__, "ERROR: sequence file `%s` could not be opened.\n", seq_filename );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: sequence file `%s` could not be opened.\n", seq_filename );
     return false;
   }
   if ( file_sz < ( offset_sz + total_sz ) ) {
-    _dbprinterr( __LINE__, "ERROR: sequence file is too short to contain frame %i data.\n", frame_idx );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: sequence file is too short to contain frame %i data.\n", frame_idx );
     return false;
   }
 
   if ( info_ptr->biggest_frame_blob_sz < total_sz ) {
-    _dbprinterr( __LINE__, "ERROR: pre-allocated frame blob was too small for frame %i: %u/%u bytes.\n", frame_idx, info_ptr->biggest_frame_blob_sz, total_sz );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: pre-allocated frame blob was too small for frame %i: %u/%u bytes.\n", frame_idx, info_ptr->biggest_frame_blob_sz, total_sz );
     return false;
   }
 
   { // Read blob from file.
     FILE* f_ptr = fopen( seq_filename, "rb" );
     if ( !f_ptr ) {
-      _dbprinterr( __LINE__, "ERROR could not open file `%s` for frame data.\n", seq_filename );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR could not open file `%s` for frame data.\n", seq_filename );
       return false;
     }
     if ( -1 == fseek( f_ptr, (long)offset_sz, SEEK_SET ) ) {
-      _dbprinterr( __LINE__, "ERROR seeking frame %i from sequence file - file too small for data\n", frame_idx );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR seeking frame %i from sequence file - file too small for data\n", frame_idx );
       fclose( f_ptr );
       return false;
     }
     if ( !fread( info_ptr->preallocated_frame_blob_ptr, total_sz, 1, f_ptr ) ) {
-      _dbprinterr( __LINE__, "ERROR reading frame %i from sequence file\n", frame_idx );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR reading frame %i from sequence file\n", frame_idx );
       fclose( f_ptr );
       return false;
     }
@@ -325,7 +307,7 @@ bool vol_geom_read_frame( const char* seq_filename, const vol_geom_info_t* info_
   } // end FILE i/o block
 
   if ( !_read_vol_frame( info_ptr, frame_idx, frame_data_ptr ) ) {
-    _dbprinterr( __LINE__, "ERROR parsing frame %i\n", frame_idx );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR parsing frame %i\n", frame_idx );
     return false;
   }
   return true;
@@ -345,27 +327,27 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
 
     // done with file record so tidy-up memory
     if ( record.byte_ptr != NULL ) {
-      _dbprint( "Freeing record.byte_ptr\n" );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Freeing record.byte_ptr\n" );
       free( record.byte_ptr );
       record.byte_ptr = NULL; // this is checked later, so make = NULL
     }
-    _dbprint( "hdr sz was %u. %u bytes in file\n", (uint32_t)hdr_sz, (uint32_t)record.sz );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "hdr sz was %u. %u bytes in file\n", (uint32_t)hdr_sz, (uint32_t)record.sz );
   }
 
   { // allocate memory for frame headers and frames directory
     vol_geom_size_t frame_headers_sz = info_ptr->hdr.frame_count * sizeof( vol_geom_frame_hdr_t );
-    _dbprint( "Allocating %u bytes for frame headers.\n", (unsigned int)frame_headers_sz );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Allocating %u bytes for frame headers.\n", (unsigned int)frame_headers_sz );
     info_ptr->frame_headers_ptr = calloc( 1, (size_t)frame_headers_sz );
     if ( !info_ptr->frame_headers_ptr ) {
-      _dbprinterr( __LINE__, "ERROR: OOM allocating frames headers\n" );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: OOM allocating frames headers\n" );
       return false;
     }
 
     vol_geom_size_t frames_directory_sz = info_ptr->hdr.frame_count * sizeof( vol_geom_frame_directory_entry_t );
-    _dbprint( "Allocating %u bytes for frames directory.\n", (unsigned int)frames_directory_sz );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Allocating %u bytes for frames directory.\n", (unsigned int)frames_directory_sz );
     info_ptr->frames_directory_ptr = calloc( 1, (size_t)frames_directory_sz );
     if ( !info_ptr->frames_directory_ptr ) {
-      _dbprinterr( __LINE__, "ERROR: OOM allocating frames directory\n" );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: OOM allocating frames directory\n" );
       return false;
     }
   }
@@ -379,14 +361,14 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
 
     f_ptr = fopen( seq_filename, "rb" );
     if ( !f_ptr ) {
-      _dbprinterr( __LINE__, "ERROR: Could not open file `%s`\n", seq_filename );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Could not open file `%s`\n", seq_filename );
       goto failed_to_read_info;
     }
 
     { // get file size to do sanity test of other sizes with
       if ( 0 != fseek( f_ptr, 0L, SEEK_END ) ) { goto failed_to_read_info; }
       sequence_file_sz = (vol_geom_size_t)ftell( f_ptr );
-      _dbprint( "Sequence file is %u bytes\n", (uint32_t)sequence_file_sz );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Sequence file is %u bytes\n", (uint32_t)sequence_file_sz );
       if ( 0 != fseek( f_ptr, 0L, SEEK_SET ) ) { goto failed_to_read_info; }
     }
 
@@ -397,23 +379,23 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
       long frame_start_offset = ftell( f_ptr );
 
       if ( !fread( &frame_hdr.frame_number, sizeof( int32_t ), 1, f_ptr ) ) {
-        _dbprinterr( __LINE__, "ERROR: frame_number at frame %i in sequence file was out of file size range\n", i );
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: frame_number at frame %i in sequence file was out of file size range\n", i );
         goto failed_to_read_info;
       }
       if ( frame_hdr.frame_number != i ) {
-        _dbprinterr( __LINE__, "ERROR: frame_number was %i at frame %i in sequence file\n", frame_hdr.frame_number, i );
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: frame_number was %i at frame %i in sequence file\n", frame_hdr.frame_number, i );
         goto failed_to_read_info;
       }
       if ( !fread( &frame_hdr.mesh_data_sz, sizeof( int32_t ), 1, f_ptr ) ) {
-        _dbprinterr( __LINE__, "ERROR: mesh_data_sz %i was out of file size range in sequence file\n", frame_hdr.mesh_data_sz );
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: mesh_data_sz %i was out of file size range in sequence file\n", frame_hdr.mesh_data_sz );
         goto failed_to_read_info;
       }
       if ( frame_hdr.mesh_data_sz < 0 || (vol_geom_size_t)frame_hdr.mesh_data_sz > sequence_file_sz ) {
-        _dbprinterr( __LINE__, "ERROR: mesh_data_sz %i was invalid for a sequence of %u bytes\n", frame_hdr.mesh_data_sz, (uint32_t)sequence_file_sz );
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: mesh_data_sz %i was invalid for a sequence of %u bytes\n", frame_hdr.mesh_data_sz, (uint32_t)sequence_file_sz );
         goto failed_to_read_info;
       }
       if ( !fread( &frame_hdr.keyframe, sizeof( uint8_t ), 1, f_ptr ) ) {
-        _dbprinterr( __LINE__, "ERROR: keyframe (type) was out of file size range in sequence file\n" );
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: keyframe (type) was out of file size range in sequence file\n" );
         goto failed_to_read_info;
       }
 
@@ -436,14 +418,14 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
         }
       }
       if ( info_ptr->frames_directory_ptr[i].corrected_payload_sz > sequence_file_sz ) {
-        _dbprinterr( __LINE__, "ERROR: frame %i corrected_payload_sz %i bytes was too large for a sequence of %u bytes\n", i,
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: frame %i corrected_payload_sz %i bytes was too large for a sequence of %u bytes\n", i,
           info_ptr->frames_directory_ptr[i].corrected_payload_sz, (uint32_t)sequence_file_sz );
         goto failed_to_read_info;
       }
 
       // seek past mesh data and past the final integer "frame data size". see if file is big enough
       if ( -1 == fseek( f_ptr, (long)info_ptr->frames_directory_ptr[i].corrected_payload_sz + 4, SEEK_CUR ) ) {
-        _dbprinterr( __LINE__, "ERROR: not enough memory in sequence file for frame %i contents\n", i );
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: not enough memory in sequence file for frame %i contents\n", i );
         goto failed_to_read_info;
       }
       frame_current_offset = ftell( f_ptr );
@@ -453,8 +435,8 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
       info_ptr->frames_directory_ptr[i].total_sz  = (vol_geom_size_t)frame_current_offset - (vol_geom_size_t)frame_start_offset;
       info_ptr->frame_headers_ptr[i]              = frame_hdr;
       if ( info_ptr->frames_directory_ptr[i].total_sz > sequence_file_sz ) {
-        _dbprinterr( __LINE__, "ERROR: frame %i total_sz %i bytes was too large for a sequence of %u bytes\n", i, info_ptr->frames_directory_ptr[i].total_sz,
-          (uint32_t)sequence_file_sz );
+        _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: frame %i total_sz %i bytes was too large for a sequence of %u bytes\n", i,
+          info_ptr->frames_directory_ptr[i].total_sz, (uint32_t)sequence_file_sz );
         goto failed_to_read_info;
       }
 
@@ -468,14 +450,14 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
     f_ptr = NULL; // this is checked later, so make = NULL
   }
 
-  _dbprint( "Allocating preallocated_frame_blob_ptr bytes %u (frame %i)\n", (uint32_t)info_ptr->biggest_frame_blob_sz, biggest_frame_idx );
+  _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Allocating preallocated_frame_blob_ptr bytes %u (frame %i)\n", (uint32_t)info_ptr->biggest_frame_blob_sz, biggest_frame_idx );
   if ( info_ptr->biggest_frame_blob_sz >= 1024 * 1024 * 1024 ) {
-    _dbprinterr( __LINE__, "ERROR: extremely high frame size %u reported - assuming error.\n", (uint32_t)info_ptr->biggest_frame_blob_sz );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: extremely high frame size %u reported - assuming error.\n", (uint32_t)info_ptr->biggest_frame_blob_sz );
     goto failed_to_read_info;
   }
   info_ptr->preallocated_frame_blob_ptr = calloc( 1, info_ptr->biggest_frame_blob_sz );
   if ( !info_ptr->preallocated_frame_blob_ptr ) {
-    _dbprinterr( __LINE__, "ERROR: out of memory allocating frame blob reserve.\n" );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: out of memory allocating frame blob reserve.\n" );
     goto failed_to_read_info;
   }
 
@@ -483,10 +465,10 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
 
 failed_to_read_info:
 
-  _dbprinterr( __LINE__, "ERROR: Failed to parse info from vologram geometry files.\n" );
+  _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Failed to parse info from vologram geometry files.\n" );
   if ( f_ptr ) { fclose( f_ptr ); }
   if ( record.byte_ptr ) {
-    _dbprint( "Freeing record.byte_ptr\n" );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Freeing record.byte_ptr\n" );
     free( record.byte_ptr );
   }
   vol_geom_free_file_info( info_ptr );
@@ -498,15 +480,15 @@ bool vol_geom_free_file_info( vol_geom_info_t* info_ptr ) {
   if ( !info_ptr ) { return false; }
 
   if ( info_ptr->preallocated_frame_blob_ptr ) {
-    _dbprint( "Freeing preallocated_frame_blob_ptr\n" );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Freeing preallocated_frame_blob_ptr\n" );
     free( info_ptr->preallocated_frame_blob_ptr );
   }
   if ( info_ptr->frame_headers_ptr ) {
-    _dbprint( "Freeing frame_headers_ptr\n" );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Freeing frame_headers_ptr\n" );
     free( info_ptr->frame_headers_ptr );
   }
   if ( info_ptr->frames_directory_ptr ) {
-    _dbprint( "Freeing frames_directory_ptr\n" );
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Freeing frames_directory_ptr\n" );
     free( info_ptr->frames_directory_ptr );
   }
   *info_ptr = ( vol_geom_info_t ){ .hdr.frame_count = 0 };
@@ -530,4 +512,8 @@ int vol_geom_find_previous_keyframe( const vol_geom_info_t* info_ptr, int frame_
     if ( vol_geom_is_keyframe( info_ptr, i ) ) { return i; }
   }
   return -1;
+}
+
+void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str, int message_len ) ) {
+  _logger_ptr = user_function_ptr;
 }

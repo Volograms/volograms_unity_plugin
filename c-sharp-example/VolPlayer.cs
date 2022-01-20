@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 
 [RequireComponent(typeof(MeshFilter))]
 [RequireComponent(typeof(MeshRenderer))]
@@ -26,7 +27,7 @@ public class VolPlayer : MonoBehaviour
     [Header("Playback Settings")]
     public bool playOnStart = true;
     public bool isLooping = true;
-
+    
     private string _fullGeomPath;
     private string _fullVideoPath;
     private int _frameCount;
@@ -38,15 +39,20 @@ public class VolPlayer : MonoBehaviour
     private MeshRenderer _meshRenderer;
     private ushort[] _keyShortIndices;
     private Vector2[] _keyUvs;
+    [SerializeField]
     private Texture2D _voloTexture;
     private IntPtr _colorPtr;
     private VolPluginInterface.VolGeometryData _geometryData;
+    private byte[] _meshData;
+    private static readonly int VMainTex = Shader.PropertyToID("_MainTex");
 
     public bool IsOpen { get; private set; }
     public bool IsPlaying { get; private set; }
     
     private void Start()
     {
+        print("Start VolPlayer");
+        VolPluginInterface.SetUpDebugging();
         Application.targetFrameRate = 60;
 #if UNITY_EDITOR
         if (_meshFilter.sharedMesh == null)
@@ -69,6 +75,7 @@ public class VolPlayer : MonoBehaviour
 
     void Update()
     {
+        //print($"Playing {IsPlaying}, numFrames {_numFrames}, nextFrame {VolPluginInterface.VolGeomGetNextFrameIndex()}, timeTracker {_timeTracker}");
         if (!IsPlaying) return;
         
         if (VolPluginInterface.VolGeomGetNextFrameIndex() >= _numFrames)
@@ -124,11 +131,20 @@ public class VolPlayer : MonoBehaviour
                 return false;
             }
         }
+        
+        print(VolPluginInterface.VolGetVideoWidth());
+        print(VolPluginInterface.VolGetVideoHeight());
+        print(VolPluginInterface.VolGetNumFrames());
+        print(VolPluginInterface.VolGetDuration());
+        print(VolPluginInterface.VolGetFrameRate());
+        print(VolPluginInterface.VolGetFrameSize());
+
 
         _fullGeomPath = ResolvePath(volFolderPathType, volFolder);
         string headerFile = Path.Combine(_fullGeomPath, "header.vols");
         string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
         bool geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile);
+        print($"Geometry opened: {geomOpened}");
         
         if (!geomOpened)
         {
@@ -137,19 +153,27 @@ public class VolPlayer : MonoBehaviour
             IsOpen = false;
             return false;
         }
+        
+        print(VolPluginInterface.VolGeomGetFrameCount());
+        print(VolPluginInterface.VolGeomGetPtrData());
 
         _frameCount = 0;
         _numFrames = VolPluginInterface.VolGeomGetFrameCount(); 
-        _secondsPerFrame = 1f /(float) VolPluginInterface.VolGetFrameRate();
+        _secondsPerFrame = 1f / 60f;
 
         _voloTexture = new Texture2D(
             VolPluginInterface.VolGetVideoWidth(),
             VolPluginInterface.VolGetVideoHeight(), 
-            TextureFormat.RGB24, 
-            false, 
-            false);
-
+            TextureFormat.RGB24, false, false);
+        
+#if UNITY_EDITOR
+        _meshRenderer.sharedMaterial.SetTexture(VMainTex, _voloTexture);
+#else
+        _meshRenderer.material.SetTexture(VMainTex, _voloTexture);
+#endif
+        
         IsOpen = true;
+        //VolPluginInterface.InitCommandBuffer();
         return true;
     }
     
@@ -289,15 +313,20 @@ public class VolPlayer : MonoBehaviour
     {
         if (_frameCount >= _numFrames)
             return;
+
+        //IntPtr ptr = VolPluginInterface.VolReadNextFrame();
+        //VolPluginInterface.UpdateTexture(_voloTexture);
+        //_frameCount++;
+        //return;
         
         _colorPtr = VolPluginInterface.VolReadNextFrame();
         _voloTexture.LoadRawTextureData(_colorPtr, (int)VolPluginInterface.VolGetFrameSize());
         _voloTexture.Apply();
         
 #if UNITY_EDITOR
-        _meshRenderer.sharedMaterial.mainTexture = _voloTexture;
+        _meshRenderer.sharedMaterial.SetTexture(VMainTex, _voloTexture);
 #else
-        _meshRenderer.material.mainTexture = _voloTexture;
+        _meshRenderer.material.SetTexture(VMainTex, _voloTexture);
 #endif
         _frameCount++;
     }
@@ -313,12 +342,13 @@ public class VolPlayer : MonoBehaviour
         }
         
         _geometryData = VolPluginInterface.VolGeomGetPtrData();
-        if (_geometryData.bytesSize == 0)
+        
+        if (_geometryData.blockDataSize == 0)
             return;
 
-        byte[] meshData = new byte[_geometryData.bytesSize];
-        Marshal.Copy(_geometryData.bytePtr, meshData, 0, (int)_geometryData.bytesSize);
-        NativeArray<byte> nativeMeshData = new NativeArray<byte>(meshData, Allocator.Persistent);
+        _meshData = new byte[_geometryData.blockDataSize];
+        Marshal.Copy(_geometryData.blockDataPtr, _meshData, 0, (int)_geometryData.blockDataSize);
+        NativeArray<byte> nativeMeshData = new NativeArray<byte>(_meshData, Allocator.Temp);
 
 #if UNITY_EDITOR
         _meshFilter.sharedMesh.Clear();
@@ -377,6 +407,15 @@ public class VolPlayer : MonoBehaviour
 #endif
 
         nativeMeshData.Dispose();
+    }
+
+    public void ChangeMaterial(Material newMaterial)
+    {
+#if UNITY_EDITOR
+        _meshRenderer.sharedMaterial = newMaterial;
+#else
+        _meshRenderer.material = newMaterial;
+#endif
     }
 
     private string ResolvePath(PathType type, string path)

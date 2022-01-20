@@ -166,9 +166,16 @@ VOL_GEOM_EXPORT typedef struct vol_geom_frame_data_t {
   int32_t texture_sz;
 } vol_geom_frame_data_t;
 
-/******************************************************************************
-  BASIC API
-******************************************************************************/
+/** In your application these enum values can be used to filter out or categorise messages given by vol_geom_log_callback. */
+typedef enum vol_geom_log_type_t {
+  VOL_GEOM_LOG_TYPE_INFO = 0,
+  VOL_GEOM_LOG_TYPE_DEBUG,
+  VOL_GEOM_LOG_TYPE_WARNING,
+  VOL_GEOM_LOG_TYPE_ERROR,
+  VOL_GEOM_LOG_TYPE_MAX
+} vol_geom_log_type_t;
+
+VOL_GEOM_EXPORT void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str, int message_len ) );
 
 /** Call this function before playing a vologram sequence.
  * It will build a directory of file and frame information about the VOL sequence, and pre-allocate memory.

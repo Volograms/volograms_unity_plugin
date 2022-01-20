@@ -186,6 +186,7 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
     p->output_frame_rgb_ptr->width  = p->codec_ctx_ptr->width;
     p->output_frame_rgb_ptr->height = p->codec_ctx_ptr->height;
 
+    // NOTE(Anton) This API is quite confusing
     // The allocated image buffer has to be freed by using av_freep(&pointers[0]).
     int align = 32;                        // NOTE(Anton) I haven no idea if this is correct!!
     int ret   = av_image_alloc(            //

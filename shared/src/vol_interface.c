@@ -49,7 +49,7 @@ extern "C"
 
 //  Unity logging taken from: https://stackoverflow.com/questions/43732825/use-debug-log-from-c 
 /** Unity logging callback type */
-typedef void(*FuncCallBack)(const char* message, int color, int size);
+typedef void(*FuncCallBack)(vol_geom_log_type_t type, const char* message, int size);
 
 /** Print message to log file
  @param str     Message to print
@@ -68,7 +68,7 @@ static bool _str_to_logfile( const char* str ) {
  @param color       Color of the text
  @param size        Size of the message in bytes
  */
-void default_print(const char* message, int color, int size)
+void default_print(vol_geom_log_type_t type, const char* message, int size)
 {
     _str_to_logfile(message);
 }
@@ -81,17 +81,7 @@ static FuncCallBack callbackInstance = default_print;
  */
 DllExport void register_debug_callback(FuncCallBack cb) {
     callbackInstance = cb;
-}
-
-/** Buffer used to contain the message for debug logging */
-static char log_msg_buf[255];
-    
-/** Log a message using the logging callback function
- @param message     Message to log
- @param color       Color of the message text
- */
-void debug_log(const char* message, enum Color color) {
-    callbackInstance(message, (int)color, (int)strlen(message));
+    vol_geom_set_log_callback(cb);
 }
 
 /**
