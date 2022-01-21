@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.6.1
+ * Version   | 0.7.0
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -21,6 +21,7 @@
  *
  * History
  * -------
+ * - 0.7.0 (2021/01/20) - Added customisable debug callback.
  * - 0.6.1 (2021/11/25) - Patched 0.6 to add file memory size validation vulnerabilities reported by fuzzer.
  * - 0.6   (2021/11/24) - Better memory allocation and management - improved performance & simpler API should reduce risk of accidental memory leaks.
  * - 0.5   (2021/11/15) - Better platform consistency with specified byte-size type.
@@ -168,11 +169,11 @@ VOL_GEOM_EXPORT typedef struct vol_geom_frame_data_t {
 
 /** In your application these enum values can be used to filter out or categorise messages given by vol_geom_log_callback. */
 typedef enum vol_geom_log_type_t {
-  VOL_GEOM_LOG_TYPE_INFO = 0,
+  VOL_GEOM_LOG_TYPE_INFO = 0, //
   VOL_GEOM_LOG_TYPE_DEBUG,
   VOL_GEOM_LOG_TYPE_WARNING,
   VOL_GEOM_LOG_TYPE_ERROR,
-  VOL_GEOM_LOG_TYPE_MAX
+  VOL_GEOM_LOG_STR_MAX_LEN // Not an error type, just used to count the error types.
 } vol_geom_log_type_t;
 
 VOL_GEOM_EXPORT void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str, int message_len ) );

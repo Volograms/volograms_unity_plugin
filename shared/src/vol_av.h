@@ -3,7 +3,7 @@
  *
  * vol_av    | Audio-Video Decoding API
  * --------- | ----------
- * Version   | 0.7.1
+ * Version   | 0.8
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -24,6 +24,7 @@
  *
  * History
  * -----------
+ * - 0.8.0 (2021/01/20) - Added customisable debug callback.
  * - 0.7.1 (2021/12/10) - Tidied comments.
  * - 0.7   (2021/10/15) - Updated copyright and licence notice.
  * - 0.6   (2021/09/17) - Fixes to memory leaks and delete-after-free found in testing and fuzzing.
@@ -66,6 +67,17 @@ VOL_AV_EXPORT typedef struct vol_av_video_t {
   /** Dimensions of image in `pixels_ptr`. */
   int w, h;
 } vol_av_video_t;
+
+/** In your application these enum values can be used to filter out or categorise messages given by vol_av_log_callback. */
+typedef enum vol_av_log_type_t {
+  VOL_AV_LOG_TYPE_INFO = 0, //
+  VOL_AV_LOG_TYPE_DEBUG,
+  VOL_AV_LOG_TYPE_WARNING,
+  VOL_AV_LOG_TYPE_ERROR,
+  VOL_AV_LOG_STR_MAX_LEN // Not an error type, just used to count the error types.
+} vol_av_log_type_t;
+
+VOL_AV_EXPORT void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str, int message_len ) );
 
 /** Open a video file given by `filename`.
  * @param filename File path to the movie file to open. Must not be NULL.

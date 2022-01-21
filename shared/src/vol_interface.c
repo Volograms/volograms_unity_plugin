@@ -82,6 +82,7 @@ static FuncCallBack callbackInstance = default_print;
 DllExport void register_debug_callback(FuncCallBack cb) {
     callbackInstance = cb;
     vol_geom_set_log_callback(cb);
+    vol_av_set_log_callback(cb);
 }
 
 /**

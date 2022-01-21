@@ -1,7 +1,7 @@
 /** @file vol_av.c
  * Volograms SDK Audio-Video Decoding API
  *
- * Version:   0.7.1 \n
+ * Version:   0.8.0 \n
  * Authors:   Anton Gerdelan <anton@volograms.com> \n
  * Copyright: 2021, Volograms (http://volograms.com/) \n
  * Language:  C99 \n
@@ -18,93 +18,73 @@
 #include <stdlib.h>
 #include <string.h>
 
-/** To suppress compiler warnings. */
-#define VOL_AV_UNUSED( x ) (void)( x )
+#define VOL_AV_LOG_STR_MAX_LEN 512 // Careful - this is stored on the stack to be thread and memory-safe so don't make it too large.
 
 /** Internal ffmepg-specific context variables. This struct lives inside the vol_av_video_t interface struct. */
 struct vol_av_internal_t {
-  //
   // Video File Codec Context
   AVFormatContext* fmt_ctx_ptr;  /** Holds the header information from the format (Container). http://ffmpeg.org/doxygen/trunk/structAVFormatContext.html */
   AVCodec* codec_ptr;            /** Video codec - decoder found for file format. http://ffmpeg.org/doxygen/trunk/structAVCodec.html */
   AVCodecContext* codec_ctx_ptr; /** Video codec context. https://ffmpeg.org/doxygen/trunk/structAVCodecContext.html */
   int video_stream_idx;          /** The valid video stream index we found by looping over the stream ptrs. */
 
-  //
   // Current Decoded Frame Output
   AVFrame* output_frame_ptr;     /** Decoded frame in native format. // https://ffmpeg.org/doxygen/trunk/structAVFrame.html */
   AVFrame* output_frame_rgb_ptr; /** Conversion of `output_frame_ptr` to a RGB format for use in engines. */
   uint8_t* internal_buffer_ptr;  /** Temporary decoding storage. */
 
-  //
   // Tools
   struct SwsContext* sws_conv_ctx_ptr; /** Scaling/image conversion context. */
 
   int w, h; /** Dimensions of `output_frame_rgb_ptr`. */
 };
 
-/** Printf an error message to stderr, but only if VOL_AV_DEBUG is set.
- * @param line   Use `__LINE__` here to print the line number of the error message.
- * @param fmt    A formatted string in `printf()` variable-argument, (supporting `%%i`, `%%f` etc.). \n
- * Example:      `_dbprinterr(__LINE__, "testing thing %i\n", 10 );` \n
- * That will output: `ERROR vol_av.c:64 testing thing 10`
- */
-static void _dbprinterr( int line, const char* fmt, ... ) {
-#ifdef VOL_AV_DEBUG
-  va_list args;
-  fprintf( stderr, "ERROR vol_av.c:%i ", line );
-  va_start( args, fmt );
-  vfprintf( stderr, fmt, args );
-  va_end( args );
-#else
-  VOL_AV_UNUSED( fmt );
-  VOL_AV_UNUSED( line );
-#endif
+static void _default_logger( vol_av_log_type_t log_type, const char* message_str, int len ) {
+  FILE* stream_ptr = ( VOL_AV_LOG_TYPE_ERROR == log_type || VOL_AV_LOG_TYPE_WARNING == log_type ) ? stderr : stdout;
+  (void)len; // Unused here.
+  fprintf( stream_ptr, "%s", message_str );
 }
 
-/** Printf an error message to stdout, but only if `VOL_AV_DEBUG` is set.
- * @param fmt    A formatted string in `printf()` variable-argument, (supporting `%%i`, `%%f` etc.). \n
- * Example:      `_dbprint("testing thing %i\n", 10 );` \n
- * That will output: `vol_av: testing thing 10`
- */
-static void _dbprint( const char* fmt, ... ) {
-#ifdef VOL_AV_DEBUG
-  va_list args;
-  fprintf( stdout, "vol_av: " );
-  va_start( args, fmt );
-  vfprintf( stdout, fmt, args );
-  va_end( args );
-#else
-  VOL_AV_UNUSED( fmt );
-#endif
+static void ( *_logger_ptr )( vol_av_log_type_t log_type, const char* message_str, int message_len ) = &_default_logger;
+
+// This function is used in this file as a printf-style logger. It converts that format to a simple string and passes it to _logger_ptr.
+static void _vol_loggerf( vol_av_log_type_t log_type, const char* message_str, ... ) {
+  char log_str[VOL_AV_LOG_STR_MAX_LEN];
+  log_str[0] = '\0';
+  va_list arg_ptr; // using va_args lets us make sure any printf-style formatting values are properly written into the string.
+  va_start( arg_ptr, message_str );
+  vsnprintf( log_str, VOL_AV_LOG_STR_MAX_LEN - 1, message_str, arg_ptr );
+  va_end( arg_ptr );
+  int len = strlen( log_str );
+  _logger_ptr( log_type, log_str, len );
 }
 
-//
 //
 //
 bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
   if ( !filename || !info_ptr || info_ptr->_context_ptr != NULL ) { return false; }
 
-  _dbprint( "opening URL `%s`...\n", filename );
+  _vol_loggerf( VOL_AV_LOG_TYPE_INFO, "opening URL `%s`...\n", filename );
 
   memset( info_ptr, 0, sizeof( vol_av_video_t ) );
   info_ptr->_context_ptr = calloc( 1, sizeof( vol_av_internal_t ) );
   if ( !info_ptr->_context_ptr ) {
-    _dbprinterr( __LINE__, "calloc() failed to allocate memory for internal pointer\n" );
+    _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: calloc() failed to allocate memory for internal pointer\n" );
     return false;
   }
   vol_av_internal_t* p = info_ptr->_context_ptr;
 
   { // Open the file and read its header. The codecs are not opened. -- note that if first param is NULL then this allocates memory.
     if ( avformat_open_input( &p->fmt_ctx_ptr, filename, NULL, NULL ) < 0 ) { // NOTE(Anton) the second param is `url` and we can try a web stream.
-      _dbprinterr( __LINE__, "Failed to open input file.\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: Failed to open input file.\n" );
       return false;
     }
-    _dbprint( "format: %s, duration: %lld us, bit_rate: %lld\n", p->fmt_ctx_ptr->iformat->name, p->fmt_ctx_ptr->duration, p->fmt_ctx_ptr->bit_rate );
+    _vol_loggerf( VOL_AV_LOG_TYPE_INFO, "format: %s, duration: %lld us, bit_rate: %lld\n", p->fmt_ctx_ptr->iformat->name, p->fmt_ctx_ptr->duration,
+      p->fmt_ctx_ptr->bit_rate );
 
     // Read packets from the AVFormatContext to get stream information. this function populates p->fmt_ctx_ptr->streams
     if ( avformat_find_stream_info( p->fmt_ctx_ptr, NULL ) < 0 ) {
-      _dbprinterr( __LINE__, "Failed to get stream info.\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: Failed to get stream info.\n" );
       return false;
     }
 
@@ -117,21 +97,24 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
     p->video_stream_idx                 = -1;
     // Now p->fmt_ctx_ptr->streams is just an array of pointers, so let's walk through it until we find a video stream.
     for ( unsigned int i = 0; i < p->fmt_ctx_ptr->nb_streams; ++i ) {
-      _dbprint( "AVStream->time_base before open coded %d/%d\n", p->fmt_ctx_ptr->streams[i]->time_base.num, p->fmt_ctx_ptr->streams[i]->time_base.den );
-      _dbprint( "AVStream->r_frame_rate before open coded %d/%d\n", p->fmt_ctx_ptr->streams[i]->r_frame_rate.num, p->fmt_ctx_ptr->streams[i]->r_frame_rate.den );
-      _dbprint( "AVStream->start_time %lld\n", p->fmt_ctx_ptr->streams[i]->start_time );
-      _dbprint( "AVStream->duration %lld\n", p->fmt_ctx_ptr->streams[i]->duration ); // NB this may be wrong. use p->fmt_ctx_ptr->duration instead for us time.
+      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->time_base before open coded %d/%d\n", p->fmt_ctx_ptr->streams[i]->time_base.num,
+        p->fmt_ctx_ptr->streams[i]->time_base.den );
+      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->r_frame_rate before open coded %d/%d\n", p->fmt_ctx_ptr->streams[i]->r_frame_rate.num,
+        p->fmt_ctx_ptr->streams[i]->r_frame_rate.den );
+      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->start_time %lld\n", p->fmt_ctx_ptr->streams[i]->start_time );
+      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->duration %lld\n", p->fmt_ctx_ptr->streams[i]->duration ); // NB this may be wrong. use
+                                                                                                                // p->fmt_ctx_ptr->duration instead for us time.
 
       // NOTE(Anton) this is an update from using deprecated codec pointer (p->fmt_ctx_ptr->streams[i]->codec->codec_type).
       AVCodecParameters* tmp_codec_params_ptr = p->fmt_ctx_ptr->streams[i]->codecpar;
       if ( !tmp_codec_params_ptr ) {
-        _dbprinterr( __LINE__, "unsupported codec parameters!\n" );
+        _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: unsupported codec parameters!\n" );
         continue;
       }
       // find proper decoder
       const AVCodec* tmp_codec_ptr = avcodec_find_decoder( tmp_codec_params_ptr->codec_id ); // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
       if ( !tmp_codec_ptr ) {
-        _dbprinterr( __LINE__, "unsupported codec!\n" );
+        _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: unsupported codec!\n" );
         continue;
       }
 
@@ -141,36 +124,36 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
           p->codec_ptr        = (AVCodec*)tmp_codec_ptr;
           codec_params_ptr    = tmp_codec_params_ptr;
         }
-        _dbprint( "Video Codec: resolution %dx%d\n", tmp_codec_params_ptr->width, tmp_codec_params_ptr->height );
+        _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Video Codec: resolution %dx%d\n", tmp_codec_params_ptr->width, tmp_codec_params_ptr->height );
       } else if ( tmp_codec_params_ptr->codec_type == AVMEDIA_TYPE_AUDIO ) {
-        _dbprint( "Audio Codec: %d channels, sample rate %d\n", tmp_codec_params_ptr->channels, tmp_codec_params_ptr->sample_rate );
+        _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Audio Codec: %d channels, sample rate %d\n", tmp_codec_params_ptr->channels, tmp_codec_params_ptr->sample_rate );
       }
 
       // print its name, id and bitrate
-      _dbprint( "\tCodec %s ID %d bit_rate %lld\n", tmp_codec_ptr->name, tmp_codec_ptr->id, tmp_codec_params_ptr->bit_rate );
+      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "\tCodec %s ID %d bit_rate %lld\n", tmp_codec_ptr->name, tmp_codec_ptr->id, tmp_codec_params_ptr->bit_rate );
     }
 
     if ( p->video_stream_idx == -1 ) {
-      _dbprinterr( __LINE__, "Failed to find video stream.\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: Failed to find video stream.\n" );
       return false;
     }
 
     p->codec_ctx_ptr = avcodec_alloc_context3( p->codec_ptr );
     if ( !p->codec_ctx_ptr ) {
-      _dbprinterr( __LINE__, "failed to allocate memory for AVCodecContext\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: failed to allocate memory for AVCodecContext\n" );
       return false;
     }
     // Fill the codec context based on the values from the supplied codec parameters
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
     if ( avcodec_parameters_to_context( p->codec_ctx_ptr, codec_params_ptr ) < 0 ) {
-      _dbprinterr( __LINE__, "failed to copy codec params to codec context\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: failed to copy codec params to codec context\n" );
       return false;
     }
 
     // Initialise the AVCodecContext to use the given AVCodec.
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
     if ( avcodec_open2( p->codec_ctx_ptr, p->codec_ptr, NULL ) < 0 ) {
-      _dbprinterr( __LINE__, "failed to open codec through avcodec_open2\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: failed to open codec through avcodec_open2\n" );
       return false;
     }
   } // endblock Video Codec Context
@@ -179,7 +162,7 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
     p->output_frame_ptr     = av_frame_alloc();
     p->output_frame_rgb_ptr = av_frame_alloc();
     if ( !p->output_frame_ptr || !p->output_frame_rgb_ptr ) {
-      _dbprinterr( __LINE__, "Failed to allocate frame storage.\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: Failed to allocate frame storage.\n" );
       return false;
     }
     p->output_frame_rgb_ptr->format = AV_PIX_FMT_RGB24;
@@ -198,7 +181,7 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
       align                              // int	align_
     );
     if ( ret < 0 ) {
-      _dbprinterr( __LINE__, "failed to allocate and set up output image buffer.\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: failed to allocate and set up output image buffer.\n" );
       return false;
     }
     /* "Setup the data pointers and linesizes based on the specified image parameters and the provided array.
@@ -214,7 +197,7 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
   { // init SWS context for software scaling
     // This function can crash if it gets bad params so let's check for those first
     if ( AV_PIX_FMT_NONE == p->codec_ctx_ptr->pix_fmt ) {
-      _dbprinterr( __LINE__, "failed to get SWS context - pixel format of stream was NONE.\n" );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: failed to get SWS context - pixel format of stream was NONE.\n" );
       return false;
     }
 
@@ -234,11 +217,10 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
 
 //
 //
-//
 bool vol_av_close( vol_av_video_t* info_ptr ) {
   if ( !info_ptr || !info_ptr->_context_ptr ) { return false; }
 
-  _dbprint( "releasing all the resources...\n" );
+  _vol_loggerf( VOL_AV_LOG_TYPE_INFO, "Releasing all the resources...\n" );
 
   vol_av_internal_t* p = info_ptr->_context_ptr;
 
@@ -259,7 +241,6 @@ bool vol_av_close( vol_av_video_t* info_ptr ) {
   return true;
 }
 
-//
 //
 //
 static void _save_rgb_frame( vol_av_video_t* info_ptr ) {
@@ -284,7 +265,6 @@ static void _save_rgb_frame( vol_av_video_t* info_ptr ) {
 
 //
 //
-//
 static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
   vol_av_internal_t* p = info_ptr->_context_ptr;
 
@@ -305,7 +285,7 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
   // Supply raw packet data as input to a decoder
   int response = avcodec_send_packet( p->codec_ctx_ptr, packet_ptr ); // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
   if ( response < 0 && response != AVERROR_EOF ) {
-    _dbprinterr( __LINE__, "Error while sending a packet to the decoder: %s\n", av_err2str( response ) );
+    _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: while sending a packet to the decoder: %s\n", av_err2str( response ) );
     return response;
   }
 
@@ -319,12 +299,12 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
     if ( response == AVERROR( EAGAIN ) ) {                                     //|| response == AVERROR_EOF
       return response;
     } else if ( response < 0 && response != AVERROR_EOF ) {
-      _dbprinterr( __LINE__, "Error while receiving a frame from the decoder: %s\n", av_err2str( response ) );
+      _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: while receiving a frame from the decoder: %s\n", av_err2str( response ) );
       return response;
     }
     // NOTE(Anton) i think this is always true >=0 at this point.
     if ( response >= 0 ) {
-      _dbprint( "Frame %d (type=%c, size=%d bytes, format=%d) pts %d key_frame %d [DTS %d]\n", p->codec_ctx_ptr->frame_number,
+      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Frame %d (type=%c, size=%d bytes, format=%d) pts %d key_frame %d [DTS %d]\n", p->codec_ctx_ptr->frame_number,
         av_get_picture_type_char( p->output_frame_ptr->pict_type ), p->output_frame_ptr->pkt_size, p->output_frame_ptr->format, p->output_frame_ptr->pts,
         p->output_frame_ptr->key_frame, p->output_frame_ptr->coded_picture_number );
       _save_rgb_frame( info_ptr );
@@ -338,10 +318,9 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
 
 //
 //
-//
 bool vol_av_read_next_frame( vol_av_video_t* info_ptr ) {
   if ( !info_ptr || !info_ptr->_context_ptr ) {
-    _dbprinterr( __LINE__, "info_ptr || !info_ptr->_context_ptr NULL.\n" );
+    _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: info_ptr || !info_ptr->_context_ptr NULL.\n" );
     return false;
   }
 
@@ -349,7 +328,7 @@ bool vol_av_read_next_frame( vol_av_video_t* info_ptr ) {
 
   AVPacket* packet_ptr = av_packet_alloc(); // https://ffmpeg.org/doxygen/trunk/structAVPacket.html
   if ( !packet_ptr ) {
-    _dbprinterr( __LINE__, "Failed to allocated memory for AVPacket.\n" );
+    _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: Failed to allocated memory for AVPacket.\n" );
     return false;
   }
   int packet_response = -1;
@@ -382,18 +361,16 @@ bool vol_av_read_next_frame( vol_av_video_t* info_ptr ) {
   }
 
   av_packet_unref( packet_ptr );
-
   av_packet_free( &packet_ptr );
 
   if ( packet_response < 0 && packet_response != AVERROR_EOF && packet_response != AVERROR( EAGAIN ) ) {
-    _dbprinterr( __LINE__, "packet response was %i.\n", packet_response );
+    _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: packet response was %i.\n", packet_response );
     return false;
   }
 
   return true;
 }
 
-//
 //
 //
 void vol_av_dimensions( const vol_av_video_t* info_ptr, int* w, int* h ) {
@@ -404,7 +381,6 @@ void vol_av_dimensions( const vol_av_video_t* info_ptr, int* w, int* h ) {
   *h                   = p->codec_ctx_ptr->height;
 }
 
-//
 //
 //
 double vol_av_frame_rate( const vol_av_video_t* info_ptr ) {
@@ -418,7 +394,6 @@ double vol_av_frame_rate( const vol_av_video_t* info_ptr ) {
   return frame_rate;
 }
 
-//
 //
 //
 int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
@@ -442,7 +417,6 @@ int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
 
 //
 //
-//
 double vol_av_duration_s( const vol_av_video_t* info_ptr ) {
   if ( !info_ptr || !info_ptr->_context_ptr ) { return 0.0; }
   vol_av_internal_t* p = info_ptr->_context_ptr;
@@ -451,8 +425,13 @@ double vol_av_duration_s( const vol_av_video_t* info_ptr ) {
   return duration_s;
 }
 
-#ifdef VOL_AV_ENABLE_SEEK
 //
+//
+void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str, int message_len ) ) {
+  _logger_ptr = user_function_ptr;
+}
+
+#ifdef VOL_AV_ENABLE_SEEK
 //
 //
 bool vol_av_seek_frame( vol_av_video_t* info_ptr, int prev_frame_idx, int frame_idx ) {
