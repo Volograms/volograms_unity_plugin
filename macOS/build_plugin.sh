@@ -21,6 +21,7 @@ xcodebuild build \
     -configuration "Release" \
         HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/include" \
         LIBRARY_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/lib" \
+        OTHER_CFLAGS="-DDISABLE_LOGGING" \
         OTHER_LDFLAGS="-framework CoreFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswscale -lswresample"
 
 cp -R ${DEV_PRODUCT} ./

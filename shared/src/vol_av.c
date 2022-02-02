@@ -39,13 +39,12 @@ struct vol_av_internal_t {
   int w, h; /** Dimensions of `output_frame_rgb_ptr`. */
 };
 
-static void _default_logger( vol_av_log_type_t log_type, const char* message_str, int len ) {
+static void _default_logger( vol_av_log_type_t log_type, const char* message_str ) {
   FILE* stream_ptr = ( VOL_AV_LOG_TYPE_ERROR == log_type || VOL_AV_LOG_TYPE_WARNING == log_type ) ? stderr : stdout;
-  (void)len; // Unused here.
   fprintf( stream_ptr, "%s", message_str );
 }
 
-static void ( *_logger_ptr )( vol_av_log_type_t log_type, const char* message_str, int message_len ) = &_default_logger;
+static void ( *_logger_ptr )( vol_av_log_type_t log_type, const char* message_str ) = &_default_logger;
 
 // This function is used in this file as a printf-style logger. It converts that format to a simple string and passes it to _logger_ptr.
 static void _vol_loggerf( vol_av_log_type_t log_type, const char* message_str, ... ) {
@@ -56,7 +55,7 @@ static void _vol_loggerf( vol_av_log_type_t log_type, const char* message_str, .
   vsnprintf( log_str, VOL_AV_LOG_STR_MAX_LEN - 1, message_str, arg_ptr );
   va_end( arg_ptr );
   int len = strlen( log_str );
-  _logger_ptr( log_type, log_str, len );
+  _logger_ptr( log_type, log_str );
 }
 
 //
@@ -102,9 +101,7 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
       _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->r_frame_rate before open coded %d/%d\n", p->fmt_ctx_ptr->streams[i]->r_frame_rate.num,
         p->fmt_ctx_ptr->streams[i]->r_frame_rate.den );
       _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->start_time %lld\n", p->fmt_ctx_ptr->streams[i]->start_time );
-      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->duration %lld\n", p->fmt_ctx_ptr->streams[i]->duration ); // NB this may be wrong. use
-                                                                                                                // p->fmt_ctx_ptr->duration instead for us time.
-
+      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "AVStream->duration %lld\n", vol_av_duration_s( info_ptr ) );
       // NOTE(Anton) this is an update from using deprecated codec pointer (p->fmt_ctx_ptr->streams[i]->codec->codec_type).
       AVCodecParameters* tmp_codec_params_ptr = p->fmt_ctx_ptr->streams[i]->codecpar;
       if ( !tmp_codec_params_ptr ) {
@@ -390,7 +387,8 @@ double vol_av_frame_rate( const vol_av_video_t* info_ptr ) {
   int v_idx            = p->video_stream_idx;
   AVStream* v_strm     = p->fmt_ctx_ptr->streams[v_idx];
   AVRational avfr      = v_strm->avg_frame_rate;
-  double frame_rate    = (double)avfr.num / (double)avfr.den;
+  if ( avfr.den <= 0 ) { return 0.0; } // Safety catch.
+  double frame_rate = (double)avfr.num / (double)avfr.den;
   return frame_rate;
 }
 
@@ -409,7 +407,7 @@ int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
   // if so i'll try to calculate it NB sir fred is 1799 (frames 1 to 1800) so i think i need a +1 here in calculations that would otherwise start at 0
   double duration_s   = vol_av_duration_s( info_ptr );
   double framerate_hz = vol_av_frame_rate( info_ptr );
-  if ( framerate_hz == 0.0 ) { return 0; }
+  if ( framerate_hz <= 0.0 ) { return 0; }
   double seconds_per_frame = 1.0f / framerate_hz;
   n_frames                 = (int64_t)( duration_s / seconds_per_frame ) + 1;
   return n_frames;
@@ -419,6 +417,7 @@ int64_t vol_av_frame_count( const vol_av_video_t* info_ptr ) {
 //
 double vol_av_duration_s( const vol_av_video_t* info_ptr ) {
   if ( !info_ptr || !info_ptr->_context_ptr ) { return 0.0; }
+  if ( AV_TIME_BASE <= 0 ) { return 0.0; } // Safety catch for div by zero.
   vol_av_internal_t* p = info_ptr->_context_ptr;
   int64_t duration     = p->fmt_ctx_ptr->duration; // eg. output.mpg 5394000.  Duration: 00:00:59.93. in AV_TIME_BASE units.
   double duration_s    = duration / (double)AV_TIME_BASE;
@@ -427,33 +426,10 @@ double vol_av_duration_s( const vol_av_video_t* info_ptr ) {
 
 //
 //
-void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str, int message_len ) ) {
+void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str ) ) {
   _logger_ptr = user_function_ptr;
 }
 
-#ifdef VOL_AV_ENABLE_SEEK
-//
-//
-bool vol_av_seek_frame( vol_av_video_t* info_ptr, int prev_frame_idx, int frame_idx ) {
-  if ( !info_ptr || !info_ptr->_context_ptr ) { return false; }
-
-  if ( frame_idx == prev_frame_idx ) { return true; } // already there
-
-  int flags = 0;
-  if ( frame_idx < prev_frame_idx ) { flags = AVSEEK_FLAG_BACKWARD; }
-
-  vol_av_internal_t* p = info_ptr->_context_ptr;
-  int v_idx            = p->video_stream_idx;
-  AVStream* v_strm     = p->fmt_ctx_ptr->streams[v_idx];
-  double framerate_hz  = vol_av_frame_rate( info_ptr );
-  if ( framerate_hz == 0.0 ) { return false; }
-  double seek_s     = frame_idx * 1.0f / framerate_hz;
-  int64_t timestamp = (int64_t)( seek_s * (double)v_strm->time_base.den / v_strm->time_base.num );
-
-  // printf( " frame_idx=%i seek_s = %f / %f timestamp = %I64i / %I64i\n", frame_idx, seek_s, vol_av_duration_s( info_ptr ), timestamp,
-  // info_ptr->video_stream_ptr->duration );
-  if ( av_seek_frame( p->fmt_ctx_ptr, v_idx, timestamp, flags ) < 0 ) { return false; }
-
-  return true;
+void vol_av_reset_log_callback( void ) { 
+  _logger_ptr = &_default_logger;
 }
-#endif // VOL_AV_ENABLE_SEEK

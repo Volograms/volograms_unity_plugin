@@ -77,7 +77,8 @@ typedef enum vol_av_log_type_t {
   VOL_AV_LOG_STR_MAX_LEN // Not an error type, just used to count the error types.
 } vol_av_log_type_t;
 
-VOL_AV_EXPORT void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str, int message_len ) );
+VOL_AV_EXPORT void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str ) );
+VOL_AV_EXPORT void vol_av_reset_log_callback( void );
 
 /** Open a video file given by `filename`.
  * @param filename File path to the movie file to open. Must not be NULL.
@@ -139,16 +140,6 @@ while ( next_frame > frame ) {
 }
 */
 VOL_AV_EXPORT bool vol_av_read_next_frame( vol_av_video_t* info_ptr );
-
-#ifdef VOL_AV_ENABLE_SEEK
-
-/** @warning Unstable code. Do not use this function yet.
- * TODO(Anton) update by referencing linked tutorial's seek example.
- * @param info_ptr The context data for the file. Must not be NULL.
- */
-VOL_AV_EXPORT bool vol_av_seek_frame( vol_av_video_t* info_ptr, int prev_frame_idx, int frame_idx );
-
-#endif
 
 #ifdef __cplusplus
 }

@@ -13,12 +13,19 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdint.h> // include uint types
+#include <stddef.h>/* size_t */
 #include <string.h> // include memcpy()
 #include <unistd.h> // Added only for debugging, should be removed for builds
 #ifdef _WIN32
 #include <malloc.h> // include alloca()
+#include <windows.h> /* for backtraces and timers */
 #else
 #include <alloca.h> // include alloca()
+#include <unistd.h>
+#endif
+
+#ifdef __APPLE__
+#include <mach/mach_time.h>
 #endif
 
 #include "vol_av.h"
@@ -29,11 +36,6 @@
 #else
 #define DllExport __attribute__(( visibility("default") ))
 #endif
-
-/** Color Enum
- Used to change the colour of the debug message text
- */
-enum Color { None, Red, Green, Blue, Black, White, Yellow, Orange };
 
 #if __cplusplus
 extern "C"
@@ -49,7 +51,9 @@ extern "C"
 
 //  Unity logging taken from: https://stackoverflow.com/questions/43732825/use-debug-log-from-c 
 /** Unity logging callback type */
-typedef void(*FuncCallBack)(vol_geom_log_type_t type, const char* message, int size);
+typedef void( *vol_interface_log_callback )( int type, const char* message );
+typedef void( *vol_geom_log_callback )( vol_geom_log_type_t type, const char* message );
+typedef void( *vol_av_log_callback )( vol_av_log_type_t type, const char* message ); 
 
 /** Print message to log file
  @param str     Message to print
@@ -68,21 +72,70 @@ static bool _str_to_logfile( const char* str ) {
  @param color       Color of the text
  @param size        Size of the message in bytes
  */
-void default_print(vol_geom_log_type_t type, const char* message, int size)
+void default_print( int type, const char* message )
 {
     _str_to_logfile(message);
 }
 
 /** Debug logging function */
-static FuncCallBack callbackInstance = default_print;
+static vol_interface_log_callback log_callback = default_print;
 
 /** Register a new debug logging function
  @param cb      New debug logging callback function
  */
-DllExport void register_debug_callback(FuncCallBack cb) {
-    callbackInstance = cb;
-    vol_geom_set_log_callback(cb);
-    vol_av_set_log_callback(cb);
+DllExport void register_debug_callback( vol_interface_log_callback cb ) {
+    log_callback = cb;
+}
+
+DllExport void register_geom_log_callback( vol_geom_log_callback cb ) {
+    vol_geom_set_log_callback( cb );
+}
+
+DllExport void register_av_log_callback( vol_av_log_callback cb ) {
+    vol_av_set_log_callback( cb );
+}
+
+DllExport void clear_logging_functions( void ) {
+    log_callback = default_print;
+    vol_av_reset_log_callback();
+    vol_geom_reset_log_callback();
+}
+
+static uint64_t _frequency = 1000000, _offset;
+
+void apg_time_init( void ) {
+#ifdef _WIN32
+  uint64_t counter;
+  _frequency = 1000; // QueryPerformanceCounter default
+  QueryPerformanceFrequency( (LARGE_INTEGER*)&_frequency );
+  QueryPerformanceCounter( (LARGE_INTEGER*)&_offset );
+#elif __APPLE__
+  mach_timebase_info_data_t info;
+  mach_timebase_info( &info );
+  _frequency       = ( info.denom * 1e9 ) / info.numer;
+  _offset          = mach_absolute_time();
+#else
+  _frequency = 1000000000; // nanoseconds
+  struct timespec ts;
+  clock_gettime( CLOCK_MONOTONIC, &ts );
+  _offset = (uint64_t)ts.tv_sec * (uint64_t)_frequency + (uint64_t)ts.tv_nsec;
+#endif
+}
+
+double apg_time_s( void ) {
+#ifdef _WIN32
+  uint64_t counter = 0;
+  QueryPerformanceCounter( (LARGE_INTEGER*)&counter );
+  return (double)( counter - _offset ) / _frequency;
+#elif __APPLE__
+  uint64_t counter = mach_absolute_time();
+  return (double)( counter - _offset ) / _frequency;
+#else
+  struct timespec ts;
+  clock_gettime( CLOCK_MONOTONIC, &ts );
+  uint64_t counter = (uint64_t)ts.tv_sec * (uint64_t)_frequency + (uint64_t)ts.tv_nsec;
+  return (double)( counter - _offset ) / _frequency;
+#endif
 }
 
 /**
@@ -101,10 +154,10 @@ static int curr_geom_frame;
  @param seq_filename    Path to the sequence file
  @returns               If the operation was successful
  */
-DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* seq_filename)
+DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* seq_filename, bool streaming_mode)
 {
     memset(&geom_file_ptr, 0, sizeof(vol_geom_info_t));
-    bool opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr);
+    bool opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr, streaming_mode);
     
     if ( !opened )
         return opened;
@@ -134,13 +187,27 @@ DllExport int native_vol_get_geom_frame_count(void)
 
 /** Reads the next geometry frame
  @param seq_filename    The path to the geometry file
+ @param frame           Index of the frame you want to read
+ @returns               If the operation was a success
+ */
+DllExport bool native_vol_read_geom_frame(const char* seq_filename, int frame) 
+{
+    if ( frame >= geom_file_ptr.hdr.frame_count )
+        return false;
+
+    bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, frame, &geom_frame_data );
+    curr_geom_frame = frame;
+    return ret; 
+}
+
+/** Reads the next geometry frame
+ @param seq_filename    The path to the geometry file
  @returns               If the operation was a success
  */
 DllExport bool native_vol_read_next_geom_frame(const char* seq_filename)
 {
-    if ( curr_geom_frame >= geom_file_ptr.hdr.frame_count)
+    if ( curr_geom_frame >= geom_file_ptr.hdr.frame_count )
         return false;
-    
     bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, curr_geom_frame, &geom_frame_data );
     curr_geom_frame++;
     return ret;
@@ -197,7 +264,7 @@ DllExport bool native_vol_open_video_file(const char* filename)
 {
     memset( &video_file_ptr, 0, sizeof(vol_av_video_t));
     bool ret = vol_av_open(filename, &video_file_ptr);
-    
+    apg_time_init();
     if ( ret ) {
         vol_av_dimensions( &video_file_ptr, &vid_w, &vid_h );
         vid_frm_rt = vol_av_frame_rate( &video_file_ptr );

@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.7.0
+ * Version   | 0.7.1
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -24,13 +24,12 @@
 /// File header section size in bytes. Used in sanity checks to test for corrupted files that are below minimum sizes expected.
 #define VOL_GEOM_FRAME_MIN_SZ 17 /// 3 ints, 1 byte, 1 int inside vertices array. the rest are optional
 
-static void _default_logger( vol_geom_log_type_t log_type, const char* message_str, int len ) {
+static void _default_logger( vol_geom_log_type_t log_type, const char* message_str ) {
   FILE* stream_ptr = ( VOL_GEOM_LOG_TYPE_ERROR == log_type || VOL_GEOM_LOG_TYPE_WARNING == log_type ) ? stderr : stdout;
-  (void)len; // Unused here.
   fprintf( stream_ptr, "%s", message_str );
 }
 
-static void ( *_logger_ptr )( vol_geom_log_type_t log_type, const char* message_str, int message_len ) = &_default_logger;
+static void ( *_logger_ptr )( vol_geom_log_type_t log_type, const char* message_str ) = &_default_logger;
 
 // This function is used in this file as a printf-style logger. It converts that format to a simple string and passes it to _logger_ptr.
 static void _vol_loggerf( vol_geom_log_type_t log_type, const char* message_str, ... ) {
@@ -41,7 +40,7 @@ static void _vol_loggerf( vol_geom_log_type_t log_type, const char* message_str,
   vsnprintf( log_str, VOL_GEOM_LOG_STR_MAX_LEN - 1, message_str, arg_ptr );
   va_end( arg_ptr );
   int len = strlen( log_str );
-  _logger_ptr( log_type, log_str, len );
+  _logger_ptr( log_type, log_str );
 }
 
 /// Helper struct to refer to an entire file loaded from disk via `_read_entire_file()`.
@@ -287,7 +286,12 @@ bool vol_geom_read_frame( const char* seq_filename, const vol_geom_info_t* info_
     return false;
   }
 
-  { // Read blob from file.
+  // Find frame section within sequence file blob if it was pre-loaded.
+  if ( info_ptr->sequence_blob_byte_ptr ) {
+    memcpy( info_ptr->preallocated_frame_blob_ptr, &info_ptr->sequence_blob_byte_ptr[offset_sz], total_sz );
+
+    // Read frame blob from file.
+  } else {
     FILE* f_ptr = fopen( seq_filename, "rb" );
     if ( !f_ptr ) {
       _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR could not open file `%s` for frame data.\n", seq_filename );
@@ -313,14 +317,14 @@ bool vol_geom_read_frame( const char* seq_filename, const vol_geom_info_t* info_
   return true;
 }
 
-bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filename, vol_geom_info_t* info_ptr ) {
+bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filename, vol_geom_info_t* info_ptr, bool streaming_mode ) {
   if ( !hdr_filename || !seq_filename || !info_ptr ) { return false; }
 
   FILE* f_ptr = NULL; // this is checked later so declare & init up top.
   // Read file header.
   vol_geom_file_record_t record = ( vol_geom_file_record_t ){ .sz = 0 };
   vol_geom_size_t hdr_sz        = 0;
-  info_ptr->hdr                 = ( vol_geom_file_hdr_t ){ .version = 0 };
+  *info_ptr                     = ( vol_geom_info_t ){ .biggest_frame_blob_sz = 0 }; // zero in case of struct re-use.
   {
     if ( !_read_entire_file( hdr_filename, &record ) ) { goto failed_to_read_info; }
     if ( !_read_vol_file_hdr( &record, &info_ptr->hdr, &hdr_sz ) ) { goto failed_to_read_info; }
@@ -445,7 +449,6 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
         biggest_frame_idx               = i;
       }
     }
-
     fclose( f_ptr );
     f_ptr = NULL; // this is checked later, so make = NULL
   }
@@ -459,6 +462,14 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
   if ( !info_ptr->preallocated_frame_blob_ptr ) {
     _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: out of memory allocating frame blob reserve.\n" );
     goto failed_to_read_info;
+  }
+
+  // If not dealing with huge sequence files - preload the whole thing to memory to avoid file i/o problems.
+  if ( !streaming_mode ) {
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Reading entire sequence file to blob memory\n" );
+    vol_geom_file_record_t seq_blob = ( vol_geom_file_record_t ){ .sz = 0 };
+    if ( !_read_entire_file( seq_filename, &seq_blob ) ) { goto failed_to_read_info; }
+    info_ptr->sequence_blob_byte_ptr = (uint8_t*)seq_blob.byte_ptr;
   }
 
   return true;
@@ -478,6 +489,11 @@ failed_to_read_info:
 
 bool vol_geom_free_file_info( vol_geom_info_t* info_ptr ) {
   if ( !info_ptr ) { return false; }
+
+  if ( info_ptr->sequence_blob_byte_ptr ) {
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Freeing sequence_blob_byte_ptr\n" );
+    free( info_ptr->sequence_blob_byte_ptr );
+  }
 
   if ( info_ptr->preallocated_frame_blob_ptr ) {
     _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Freeing preallocated_frame_blob_ptr\n" );
@@ -514,6 +530,10 @@ int vol_geom_find_previous_keyframe( const vol_geom_info_t* info_ptr, int frame_
   return -1;
 }
 
-void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str, int message_len ) ) {
+void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str ) ) {
   _logger_ptr = user_function_ptr;
+}
+
+void vol_geom_reset_log_callback( void ) {
+  _logger_ptr = &_default_logger;
 }
