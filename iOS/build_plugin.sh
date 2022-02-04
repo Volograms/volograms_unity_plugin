@@ -2,21 +2,44 @@
 echo ""
 echo "Building plugin for iOS"
 
-SIM_TARGET_NAME=$( xcodebuild -scheme vol_unity_lib_ios -sdk iphonesimulator -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj -destination 'platform=iOS Simulator,OS=14.0.1,name=iPad (8th generation)' -showBuildSettings | grep FULL_PRODUCT_NAME | grep -oE '[^ ]+$' )
-SIM_PRODUCT_DIR=$( xcodebuild -scheme vol_unity_lib_ios -sdk iphonesimulator -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj -destination 'platform=iOS Simulator,OS=14.0.1,name=iPad (8th generation)' -showBuildSettings | grep TARGET_BUILD_DIR | grep -oEi "\/.*" )
-SIM_PRODUCT="${SIM_PRODUCT_DIR}/${SIM_TARGET_NAME}"
-echo $SIM_PRODUCT
-xcodebuild build -quiet -scheme vol_unity_lib_ios -sdk iphonesimulator -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj -destination 'platform=iOS Simulator,OS=14.0.1,name=iPad (8th generation)' 
+if [[ -z ${FFMPEG_KIT+empty} ]]; then 
+    echo "Make sure the var FFMPEG_KIT is set to the directory of ffmpeg kit"
+    exit 
+fi
+
+echo "FFMPEG_KIT: ${FFMPEG_KIT}"
+
+xcodebuild build \
+    -sdk iphonesimulator \
+    -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj \
+    ONLY_ACTIVE_ARCH=NO \
+    VALID_ARCHS=x86_64 \
+    ARCHS=x86_64 \
+    -configuration "Release" \
+        HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-ios/ffmpeg/include" \
+        LIBRARY_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-ios/ffmpeg/lib" \
+        OTHER_CFLAGS="-DDISABLE_LOGGING" \
+        OTHER_LDFLAGS="-framework CoreFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswscale -lswresample -llibz -libbz2"
+
 echo "SIMULATOR BUILD COMPLETE\n"
 
-DEV_TARGET_NAME=$( xcodebuild -sdk iphoneos -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj -destination 'platform=iOS,name=Any iOS Device' -showBuildSettings | grep FULL_PRODUCT_NAME | grep -oE '[^ ]+$' )
-DEV_PRODUCT_DIR=$( xcodebuild -sdk iphoneos -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj -destination 'platform=iOS,name=Any iOS Device' -showBuildSettings | grep TARGET_BUILD_DIR | grep -oEi "\/.*" )
-DEV_PRODUCT="${DEV_PRODUCT_DIR}/${DEV_TARGET_NAME}"
-echo $DEV_PRODUCT
-xcodebuild build -quiet -sdk iphoneos -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj -destination 'platform=iOS,name=Any iOS Device'
+xcodebuild build \
+    -sdk iphoneos \
+    -project ./vol_unity_lib_ios/vol_unity_lib_ios.xcodeproj \
+    ONLY_ACTIVE_ARCH=NO \
+    VALID_ARCHS=arm64 \
+    ARCHS=arm64 \
+    -configuration "Release" \
+        HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-ios/ffmpeg/include" \
+        LIBRARY_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-ios/ffmpeg/lib" \
+        OTHER_CFLAGS="-DDISABLE_LOGGING" \
+        OTHER_LDFLAGS="-framework CoreFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswscale -lswresample -llibz -libbz2"
 echo "DEVICE BUILD COMPLETE\n"
 
-lipo -create $DEV_PRODUCT $SIM_PRODUCT -output "./libVolAv.a"
+lipo -create \
+    ./vol_unity_lib_ios/build/Release-iphoneos/libvol_unity_lib_ios.a \
+    ./vol_unity_lib_ios/build/Release-iphonesimulator/libvol_unity_lib_ios.a \
+    -output "./libVolAv.a"
 echo "UNIVERSAL LIB CREATED\n"
 
 rm -r ./vol_unity_lib_ios/build
