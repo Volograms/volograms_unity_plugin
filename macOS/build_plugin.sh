@@ -8,23 +8,22 @@ fi
 
 echo "FFMPEG_KIT: ${FFMPEG_KIT}"
 
-xcodebuild clean -scheme vol_unity_macos -project ./UnityPlugin/vol_unity_macos.xcodeproj -destination 'platform=macOS'
-
-DEV_TARGET_NAME=$( xcodebuild -scheme vol_unity_macos -project ./UnityPlugin/vol_unity_macos.xcodeproj -destination 'platform=macOS' -showBuildSettings | grep FULL_PRODUCT_NAME | grep -oE '[^ ]+$' )
-DEV_PRODUCT_DIR=$( xcodebuild -scheme vol_unity_macos -project ./UnityPlugin/vol_unity_macos.xcodeproj -destination 'platform=macOS' -showBuildSettings | grep TARGET_BUILD_DIR | grep -oEi "\/.*" )
-DEV_PRODUCT="${DEV_PRODUCT_DIR}/${DEV_TARGET_NAME}"
-xcodebuild build \
+xcodebuild clean build \
     -quiet \
-    -scheme vol_unity_macos \
     -project ./UnityPlugin/vol_unity_macos.xcodeproj \
-    -destination 'platform=macOS' \
+    ONLY_ACTIVE_ARCH=NO \
+    VALID_ARCHS=x86_64 \
+    ARCHS=x86_64 \
+    -arch x86_64 \
     -configuration "Release" \
-        HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/include" \
-        LIBRARY_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/lib" \
-        OTHER_CFLAGS="-DDISABLE_LOGGING" \
-        OTHER_LDFLAGS="-framework CoreFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswscale -lswresample"
+    HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/include" \
+    LIBRARY_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/lib" \
+    OTHER_CFLAGS="-DDISABLE_LOGGING" \
+    OTHER_LDFLAGS="-framework CoreFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswscale -lswresample"
 
-cp -R ${DEV_PRODUCT} ./
+cp -R ./UnityPlugin/build/Release/vol_unity_macos.bundle ./
+
+rm -r ./UnityPlugin/build/
 
 echo ""
 echo "\nDone!"

@@ -177,7 +177,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\shared\src\main.c" />
     <ClCompile Include="..\..\..\shared\src\vol_av.c" />
     <ClCompile Include="..\..\..\shared\src\vol_geom.c" />
   </ItemGroup>
