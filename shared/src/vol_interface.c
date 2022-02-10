@@ -15,11 +15,11 @@
 #include <stdint.h> // include uint types
 #include <stddef.h>/* size_t */
 #include <string.h> // include memcpy()
-#include <unistd.h> // Added only for debugging, should be removed for builds
 #ifdef _WIN32
 #include <malloc.h> // include alloca()
 #include <windows.h> /* for backtraces and timers */
 #else
+#include <unistd.h> // Added only for debugging, should be removed for builds
 #include <alloca.h> // include alloca()
 #include <unistd.h>
 #endif
