@@ -21,7 +21,9 @@ xcodebuild clean build \
     OTHER_CFLAGS="-DDISABLE_LOGGING" \
     OTHER_LDFLAGS="-framework CoreFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswscale -lswresample"
 
-cp -R ./UnityPlugin/build/Release/vol_unity_macos.bundle ./
+mkdir -p ../VologramsToolkit/Plugins/MacOS
+
+cp -R ./UnityPlugin/build/Release/vol_unity_macos.bundle ../VologramsToolkit/Plugins/MacOS/
 
 rm -r ./UnityPlugin/build/
 
