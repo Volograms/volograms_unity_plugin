@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.6.1
+ * Version   | 0.7.1
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -21,6 +21,9 @@
  *
  * History
  * -------
+ * - 0.7.1 (2021/01/24) - New option streaming_mode paramter to vol_geom_create_file_info().
+ *                        Set to false for typical phone captures to pre-load the sequence file to reduce disk I/O at run-time.
+ * - 0.7.0 (2021/01/20) - Added customisable debug callback.
  * - 0.6.1 (2021/11/25) - Patched 0.6 to add file memory size validation vulnerabilities reported by fuzzer.
  * - 0.6   (2021/11/24) - Better memory allocation and management - improved performance & simpler API should reduce risk of accidental memory leaks.
  * - 0.5   (2021/11/15) - Better platform consistency with specified byte-size type.
@@ -129,6 +132,9 @@ VOL_GEOM_EXPORT typedef struct vol_geom_info_t {
   /// This is the maximum size of the buffer pointed to by preallocated_frame_blob_ptr.
   vol_geom_size_t biggest_frame_blob_sz;
 
+  /// If streaming_mode was not set then sequence file is read to a blob pointed to by this pointer. Otherwise it is NULL and file I/O occurs on every frame read.
+  uint8_t* sequence_blob_byte_ptr;
+
 } vol_geom_info_t;
 
 /** Meta-data for each from of the Vologram sequence. */
@@ -166,9 +172,17 @@ VOL_GEOM_EXPORT typedef struct vol_geom_frame_data_t {
   int32_t texture_sz;
 } vol_geom_frame_data_t;
 
-/******************************************************************************
-  BASIC API
-******************************************************************************/
+/** In your application these enum values can be used to filter out or categorise messages given by vol_geom_log_callback. */
+typedef enum vol_geom_log_type_t {
+  VOL_GEOM_LOG_TYPE_INFO = 0, //
+  VOL_GEOM_LOG_TYPE_DEBUG,
+  VOL_GEOM_LOG_TYPE_WARNING,
+  VOL_GEOM_LOG_TYPE_ERROR,
+  VOL_GEOM_LOG_STR_MAX_LEN // Not an error type, just used to count the error types.
+} vol_geom_log_type_t;
+
+VOL_GEOM_EXPORT void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str ) );
+VOL_GEOM_EXPORT void vol_geom_reset_log_callback( void );
 
 /** Call this function before playing a vologram sequence.
  * It will build a directory of file and frame information about the VOL sequence, and pre-allocate memory.
@@ -178,11 +192,13 @@ VOL_GEOM_EXPORT typedef struct vol_geom_frame_data_t {
  * @param hdr_filename   Pointer to a char array containing the file path to the Vologram header file. Must not be NULL.
  * @param seq_filename   Pointer to a char array containing the file path to the Vologram sequence file. Must not be NULL.
  * @param info_ptr       Pointer to a `vol_geom_info_t` struct in your application that will be populated by this function. Must not be NULL.
+ * @param streaming_mode If set then sequence file is not pre-loaded to memory.
+ *                       This allows support of very large or streamed files, but may introduce file I/O performance issues.
  * @returns              Returns false on any error such as not finding the files specified, or failing to read from a file.
  * On failure, any allocated memory will be cleaned up by this function first,
  * so there is no need to call `vol_geom_free_file_info()` when this function returns `false`.
  */
-VOL_GEOM_EXPORT bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filename, vol_geom_info_t* info_ptr );
+VOL_GEOM_EXPORT bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filename, vol_geom_info_t* info_ptr, bool streaming_mode );
 
 /** Call this function to free memory allocated by a call to `vol_geom_create_file_info()` and reset struct to defaults.
  * @param info_ptr       Pointer to a `vol_geom_info_t` struct in your application that will be populated by this function. Must not be NULL.
