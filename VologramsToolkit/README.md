@@ -93,4 +93,4 @@ Then click the `+` button and searching for the above frameworks and libs by nam
 
 # Contact
 
-For any issues relating to this plugin please contact [support@volograms.com](mailto:support@volograms.com)
+For any issues relating to this plugin please open a ticket in the [Issues tab on github](https://github.com/Volograms/volograms_unity_plugin/issues)
