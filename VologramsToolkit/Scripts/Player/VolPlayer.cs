@@ -1,3 +1,10 @@
+// <copyright file=VolPlayer company=Volograms>
+// Copyright (c) 2022 All Rights Reserved
+// </copyright>
+// <author>Patrick Geoghegan</author>
+// <date>18/02/22</date>
+// <summary>Controls for vologram playback</summary>
+
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -27,9 +34,9 @@ public class VolPlayer : MonoBehaviour
     public string textureShaderId = "_MainTex";
 
     [Header("Debug Logging Options")]
-    public bool enableInterfaceLogging = false;
-    public bool enableAvLogging = false;
-    public bool enableGeomLogging = false;
+    public VolEnums.LoggingLevel interfaceLoggingLevel = VolEnums.LoggingLevel.None;
+    public VolEnums.LoggingLevel avLoggingLevel = VolEnums.LoggingLevel.None;
+    public VolEnums.LoggingLevel geomLoggingLevel = VolEnums.LoggingLevel.None;
     
     private string _fullGeomPath;
     private string _fullVideoPath;
@@ -133,15 +140,13 @@ public class VolPlayer : MonoBehaviour
             Debug.LogWarning("Cannot open a vologram while another is open");
             return false;
         }
-        
-        if (enableInterfaceLogging)
-            VolPluginInterface.EnableInterfaceLogging();
-        
-        if (enableAvLogging)
-            VolPluginInterface.EnableAvLogging();
-        
-        if (enableGeomLogging)
-            VolPluginInterface.EnableGeomLogging();
+
+        VolPluginInterface.interfaceLoggingLevel = interfaceLoggingLevel;
+        VolPluginInterface.avLoggingLevel = avLoggingLevel;
+        VolPluginInterface.geomLoggingLevel = geomLoggingLevel;
+        VolPluginInterface.EnableInterfaceLogging();
+        VolPluginInterface.EnableAvLogging();
+        VolPluginInterface.EnableGeomLogging();
 
         _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
         _fullVideoPath = volVideoTexturePathType.ResolvePath(volVideoTexture);
@@ -238,7 +243,7 @@ public class VolPlayer : MonoBehaviour
 #if UNITY_EDITOR
             _meshRenderer.sharedMaterial = material;
 #else
-            _meshRenderer.material = volMaterial;
+            _meshRenderer.material = material;
 #endif
         }
         
@@ -255,6 +260,9 @@ public class VolPlayer : MonoBehaviour
     
     public bool Close()
     {
+        if (!IsOpen) 
+            return false;
+        
         IsPlaying = false;
         bool closedVideo = VolPluginInterface.VolCloseFile();
         bool freedGeom = VolPluginInterface.VolFreeGeomData();
@@ -272,17 +280,36 @@ public class VolPlayer : MonoBehaviour
 
     public void Play()
     {
+        if (!IsOpen) 
+            return;
+        
         IsPlaying = true;
+
+        if (audioOn && _audioPlayer != null)
+        {
+            _audioPlayer.Play();
+        }
     }
 
     public void Pause()
     {
+        if (!IsOpen) 
+            return;
+        
         IsPlaying = false;
+        
+        if (audioOn && _audioPlayer != null)
+        {
+            _audioPlayer.Pause();
+        }
     }
 
     private bool _isSkipping = false;
     public void SkipTo(int frame)
     {
+        if (!IsOpen) 
+            return;
+        
         if (_isSkipping || frame <= _frameCount)
             return;
 
@@ -301,6 +328,9 @@ public class VolPlayer : MonoBehaviour
 
     public bool Restart()
     {
+        if (!IsOpen) 
+            return false;
+        
         bool closed = Close();
         if (!closed)
             return false;
@@ -337,6 +367,9 @@ public class VolPlayer : MonoBehaviour
 
     public void Step()
     {
+        if (!IsOpen) 
+            return;
+        
         playOnStart = false;
         if (VolPluginInterface.VolGeomGetNextFrameIndex() >= _numFrames)
         {
@@ -346,9 +379,11 @@ public class VolPlayer : MonoBehaviour
         ReadNextGeom();
     }
 
+    public bool IsMuted => audioOn && _audioPlayer != null && _audioPlayer.GetDirectAudioMute(0);
+
     public void SetMute(bool mute)
     {
-        if (audioOn)
+        if (audioOn && _audioPlayer != null)
         {
             _audioPlayer.SetDirectAudioMute(0, mute);
         }
@@ -446,7 +481,7 @@ public class VolPlayer : MonoBehaviour
 #if UNITY_EDITOR
             _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);
 #else
-            _meshRenderer.material.SetTexture(VMainTex, _voloTexture);
+            _meshRenderer.material.SetTexture(_textureId, _voloTexture);
 #endif
         }
 

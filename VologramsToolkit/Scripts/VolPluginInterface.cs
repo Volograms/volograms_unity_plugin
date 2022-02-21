@@ -1,17 +1,19 @@
+// <copyright file=VolPluginInterface company=Volograms>
+// Copyright (c) 2022 All Rights Reserved
+// </copyright>
+// <author>Patrick Geoghegan</author>
+// <date>18/02/22</date>
+// <summary>Interface bridging C# scripts and native C code</summary>
+
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
 using AOT;
-using Unity.Collections;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 public class VolPluginInterface
 {
 #if UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
-    private const string DLL = "vol_unity_macos";
+    private const string DLL = "volplayer";
 #elif UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
     private const string DLL = "vol_unity_lib_win";
 #elif UNITY_IOS && !UNITY_EDITOR
@@ -21,6 +23,10 @@ public class VolPluginInterface
 #else
     private const string DLL = "UnityPlugin";
 #endif
+
+    public static VolEnums.LoggingLevel interfaceLoggingLevel = VolEnums.LoggingLevel.Info;
+    public static VolEnums.LoggingLevel avLoggingLevel = VolEnums.LoggingLevel.Info;
+    public static VolEnums.LoggingLevel geomLoggingLevel = VolEnums.LoggingLevel.Info;
     
     [StructLayout(LayoutKind.Sequential)]
     public struct VolGeometryData
@@ -49,7 +55,11 @@ public class VolPluginInterface
         }
     }
 
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+#else
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Auto)]
+#endif
     public delegate void DebugDelegate(int type, string debugString);
 
     [DllImport(DLL, EntryPoint = "register_debug_callback")]
@@ -125,16 +135,20 @@ public class VolPluginInterface
         switch (logType)
         {
             case 0: 
-                Debug.Log($"VOL_LIB {debugString}");
+                if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Info))
+                    Debug.Log($"VOL_LIB {debugString}");
                 break;
             case 1:
-                Debug.Log($"VOL_LIB {debugString}");
+                if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Debug))
+                    Debug.Log($"VOL_LIB {debugString}");
                 break;
             case 2:
-                Debug.LogWarning($"VOL_LIB {debugString}");
+                if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Warning))
+                    Debug.LogWarning($"VOL_LIB {debugString}");
                 break;
             case 3:
-                Debug.LogError($"VOL_LIB {debugString}");
+                if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Error))
+                    Debug.LogError($"VOL_LIB {debugString}");
                 break;
             default:
                 Debug.Log(debugString);
@@ -148,16 +162,20 @@ public class VolPluginInterface
         switch (logType)
         {
             case 0: 
-                Debug.Log($"VOL_GEOM {debugString}");
+                if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Info))
+                    Debug.Log($"VOL_GEOM {debugString}");
                 break;
             case 1:
-                Debug.Log($"VOL_GEOM {debugString}");
+                if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Debug))
+                    Debug.Log($"VOL_GEOM {debugString}");
                 break;
             case 2:
-                Debug.LogWarning($"VOL_GEOM {debugString}");
+                if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Warning))
+                    Debug.LogWarning($"VOL_GEOM {debugString}");
                 break;
             case 3:
-                Debug.LogError($"VOL_GEOM {debugString}");
+                if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Error))
+                    Debug.LogError($"VOL_GEOM {debugString}");
                 break;
             default:
                 Debug.Log(debugString);
@@ -170,17 +188,21 @@ public class VolPluginInterface
     {
         switch (logType)
         {
-            case 0: 
-                Debug.Log($"VOL_AV {debugString}");
+            case 0:
+                if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Info))
+                    Debug.Log($"VOL_AV {debugString}");
                 break;
             case 1:
-                Debug.Log($"VOL_AV {debugString}");
+                if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Debug))
+                    Debug.Log($"VOL_AV {debugString}");
                 break;
             case 2:
-                Debug.LogWarning($"VOL_AV {debugString}");
+                if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Warning))
+                    Debug.LogWarning($"VOL_AV {debugString}");
                 break;
             case 3:
-                Debug.LogError($"VOL_AV {debugString}");
+                if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Error))
+                    Debug.LogError($"VOL_AV {debugString}");
                 break;
             default:
                 Debug.Log(debugString);

@@ -23,7 +23,7 @@ xcodebuild clean build \
 
 mkdir -p ../VologramsToolkit/Plugins/MacOS
 
-cp -R ./UnityPlugin/build/Release/vol_unity_macos.bundle ../VologramsToolkit/Plugins/MacOS/
+cp -R ./UnityPlugin/build/Release/volplayer.bundle ../VologramsToolkit/Plugins/MacOS/
 
 rm -r ./UnityPlugin/build/
 

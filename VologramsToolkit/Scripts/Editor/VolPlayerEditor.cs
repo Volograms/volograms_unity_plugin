@@ -1,9 +1,12 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
+// <copyright file=VolPlayerEditor company=Volograms>
+// Copyright (c) 2022 All Rights Reserved
+// </copyright>
+// <author>Patrick Geoghegan</author>
+// <date>18/02/22</date>
+// <summary>Custom inspector for the VolPlayer component</summary>
+
 using System.IO;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 [CustomEditor(typeof(VolPlayer))]
@@ -55,8 +58,6 @@ Geom: Enables logging of geometry-related native code"
 
     public override void OnInspectorGUI()
     {
-        //base.OnInspectorGUI();
-        
         EditorGUI.BeginChangeCheck();
         
         GUILayout.Label("Paths", EditorStyles.boldLabel);
@@ -80,7 +81,9 @@ Geom: Enables logging of geometry-related native code"
             if (!string.IsNullOrEmpty(openedFolder))
             {
                 VolEnums.PathType selectedPathType = VolEnums.DeterminePathType(openedFolder);
-                string selectedPath = openedFolder.Remove(0, selectedPathType.ToPath().Length + 1);
+                string selectedPath = selectedPathType == VolEnums.PathType.Absolute 
+                    ? openedFolder 
+                    : openedFolder.Remove(0, selectedPathType.ToPath().Length + 1);
                 _target.volFolderPathType = selectedPathType;
                 _target.volFolder = selectedPath;
                 PlayerPrefs.SetString(OpenVolFolderFileCacheId, openedFolder);
@@ -106,7 +109,9 @@ Geom: Enables logging of geometry-related native code"
             if (!string.IsNullOrEmpty(openedFile))
             {
                 VolEnums.PathType selectedPathType = VolEnums.DeterminePathType(openedFile);
-                string selectedPath = openedFile.Remove(0, selectedPathType.ToPath().Length + 1);
+                string selectedPath = selectedPathType == VolEnums.PathType.Absolute 
+                    ? openedFile 
+                    : openedFile.Remove(0, selectedPathType.ToPath().Length + 1);
                 _target.volVideoTexturePathType = selectedPathType;
                 _target.volVideoTexture = selectedPath;
                 PlayerPrefs.SetString(OpenVideoFileCacheId, Path.GetDirectoryName(openedFile) ?? string.Empty);
@@ -128,7 +133,7 @@ Geom: Enables logging of geometry-related native code"
         
         EditorGUILayout.Separator();
         GUILayout.Label("Rendering Settings", EditorStyles.boldLabel);
-        _target.material = EditorGUILayout.ObjectField("Material", _target.material, typeof(Material)) as Material;
+        _target.material = EditorGUILayout.ObjectField("Material", _target.material, typeof(Material), false) as Material;
         _target.textureShaderId = EditorGUILayout.TextField("Texture Shader ID", _target.textureShaderId);
         
         EditorGUILayout.Separator();
@@ -136,9 +141,9 @@ Geom: Enables logging of geometry-related native code"
         if (_debugFoldout)
         {
             DrawDebugLoggingHelpBox();
-            _target.enableInterfaceLogging = EditorGUILayout.Toggle("Interface", _target.enableInterfaceLogging);
-            _target.enableAvLogging = EditorGUILayout.Toggle("AV", _target.enableAvLogging);
-            _target.enableGeomLogging = EditorGUILayout.Toggle("Geom", _target.enableGeomLogging);
+            _target.interfaceLoggingLevel = (VolEnums.LoggingLevel) EditorGUILayout.EnumFlagsField("Interface", _target.interfaceLoggingLevel);
+            _target.avLoggingLevel =(VolEnums.LoggingLevel) EditorGUILayout.EnumFlagsField("AV", _target.avLoggingLevel);
+            _target.geomLoggingLevel = (VolEnums.LoggingLevel) EditorGUILayout.EnumFlagsField("Geom", _target.geomLoggingLevel);
         }
 
         if (EditorGUI.EndChangeCheck())

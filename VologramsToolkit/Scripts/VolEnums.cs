@@ -1,5 +1,11 @@
-using System.Collections;
-using System.Collections.Generic;
+// <copyright file=VolEnums company=Volograms>
+// Copyright (c) 2022 All Rights Reserved
+// </copyright>
+// <author>Patrick Geoghegan</author>
+// <date>18/02/22</date>
+// <summary>Enums used in the VologramsToolkit</summary>
+
+using System;
 using System.IO;
 using UnityEngine;
 
@@ -63,5 +69,16 @@ public static class VolEnums
         }
 
         return PathType.Absolute;
+    }
+
+    [Flags]
+    public enum LoggingLevel
+    {
+        None = 0,
+        Info = 1, 
+        Debug = 1 << 1, 
+        Warning = 1 << 2, 
+        Error = 1 << 3,
+        All = ~0
     }
 }

@@ -43,7 +43,7 @@ mkdir -p ../VologramsToolkit/Plugins/iOS/
 lipo -create \
     ./vol_unity_lib_ios/build/Release-iphoneos/libvol_unity_lib_ios.a \
     ./vol_unity_lib_ios/build/Release-iphonesimulator/libvol_unity_lib_ios.a \
-    -output "../VologramsToolkit/Plugins/iOS/libVolAv.a"
+    -output "../VologramsToolkit/Plugins/iOS/libvolplayer.a"
 echo "UNIVERSAL LIB CREATED\n"
 
 rm -r ./vol_unity_lib_ios/build
