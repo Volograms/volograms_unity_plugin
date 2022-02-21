@@ -9,12 +9,20 @@ using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEditor.iOS.Xcode;
 
+/// <summary>
+/// Class for post Unity-build functions
+/// </summary>
 public class VolPostBuild
 {
     private const string VideoToolbox = "VideoToolbox.framework";
     private const string LibZ = "libz.tbd";
     private const string LibBz2 = "libbz2.tbd";
     
+    /// <summary>
+    /// Function that is called after a successful Unity build
+    /// </summary>
+    /// <param name="target">Platform for which the build was done</param>
+    /// <param name="pathToBuiltProject">Path to the output build</param>
     [PostProcessBuild]
     private static void OnPostBuild(BuildTarget target, string pathToBuiltProject)
     {
@@ -31,6 +39,12 @@ public class VolPostBuild
         }
     }
 
+    /// <summary>
+    /// Adds Frameworks and Libs to Xcode project after iOS or Mac build
+    /// </summary>
+    /// <param name="project">Xcode project struct</param>
+    /// <param name="guid">ID of the UnityFramework target</param>
+    /// <param name="frameworks">List of Frameworks or libs to be added</param>
     private static void AddFrameworks(PBXProject project, string guid, params string[] frameworks)
     {
         foreach (string framework in frameworks)

@@ -58,9 +58,12 @@ public class VolPlayer : MonoBehaviour
 
     public bool IsOpen { get; private set; }
     public bool IsPlaying { get; private set; }
-
     public int Frame => _frameCount;
+    public bool IsMuted => audioOn && _audioPlayer != null && _audioPlayer.GetDirectAudioMute(0);
     
+    /// <summary>
+    /// Unity's Start function - called on the first frame
+    /// </summary>
     private void Start()
     {
 #if UNITY_EDITOR
@@ -96,6 +99,9 @@ public class VolPlayer : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Unity's Update function - called every frame
+    /// </summary>
     private void Update()
     {
         if (!IsPlaying) return;
@@ -122,17 +128,27 @@ public class VolPlayer : MonoBehaviour
         _timeTracker -= _secondsPerFrame;
     }
 
+    /// <summary>
+    /// Unity's OnEnable function - called when the VolPlayer becomes enabled and active
+    /// </summary>
     private void OnEnable()
     {
         _meshFilter = GetComponent<MeshFilter>();
         _meshRenderer = GetComponent<MeshRenderer>();
     }
 
+    /// <summary>
+    /// Unity's OnDisable function - called when the VolPlayer becomes disabled and inactive
+    /// </summary>
     private void OnDisable()
     {
         Close();
     }
 
+    /// <summary>
+    /// Open the given vologram files
+    /// </summary>
+    /// <returns>True if successful</returns>
     public bool Open()
     {
         if (IsOpen)
@@ -258,6 +274,10 @@ public class VolPlayer : MonoBehaviour
         return true;
     }
     
+    /// <summary>
+    /// Closes the open vologram files 
+    /// </summary>
+    /// <returns>True if successful</returns>
     public bool Close()
     {
         if (!IsOpen) 
@@ -278,6 +298,9 @@ public class VolPlayer : MonoBehaviour
         return closedVideo && freedGeom;
     }
 
+    /// <summary>
+    /// Play the vologram
+    /// </summary>
     public void Play()
     {
         if (!IsOpen) 
@@ -291,6 +314,9 @@ public class VolPlayer : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Pauses the vologram
+    /// </summary>
     public void Pause()
     {
         if (!IsOpen) 
@@ -305,6 +331,10 @@ public class VolPlayer : MonoBehaviour
     }
 
     private bool _isSkipping = false;
+    /// <summary>
+    /// (EXPERIMENTAL) Skip to a given frame number
+    /// </summary>
+    /// <param name="frame">Frame to skip to</param>
     public void SkipTo(int frame)
     {
         if (!IsOpen) 
@@ -324,8 +354,17 @@ public class VolPlayer : MonoBehaviour
         ReadNextFrame();
         ReadNextGeom(frame);
         _isSkipping = false;
+        
+        if (audioOn && _audioPlayer != null)
+        {
+            _audioPlayer.time = 1.0 / frame * 30.0;
+        }
     }
 
+    /// <summary>
+    /// Closes the vologram and re-opens it
+    /// </summary>
+    /// <returns>True if successful</returns>
     public bool Restart()
     {
         if (!IsOpen) 
@@ -365,6 +404,9 @@ public class VolPlayer : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// (EXPERIMENTAL) Move forward one frame
+    /// </summary>
     public void Step()
     {
         if (!IsOpen) 
@@ -379,8 +421,10 @@ public class VolPlayer : MonoBehaviour
         ReadNextGeom();
     }
 
-    public bool IsMuted => audioOn && _audioPlayer != null && _audioPlayer.GetDirectAudioMute(0);
-
+    /// <summary>
+    /// Mute or unmute the vologram's audio
+    /// </summary>
+    /// <param name="mute">Value for mute</param>
     public void SetMute(bool mute)
     {
         if (audioOn && _audioPlayer != null)
@@ -389,6 +433,10 @@ public class VolPlayer : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Get the width in pixels of the texture video
+    /// </summary>
+    /// <returns>Width in pixels of texture video</returns>
     public int GetVideoWidth()
     {
         if (IsOpen)
@@ -400,6 +448,10 @@ public class VolPlayer : MonoBehaviour
         return VolPluginInterface.VolGetVideoWidth();
     }
 
+    /// <summary>
+    /// Get the height in pixels of the texture video
+    /// </summary>
+    /// <returns>Height in pixels of texture video</returns>
     public int GetVideoHeight()
     {
         if (IsOpen)
@@ -411,6 +463,10 @@ public class VolPlayer : MonoBehaviour
         return VolPluginInterface.VolGetVideoHeight();
     }
 
+    /// <summary>
+    /// Get the frames per second of the texture video 
+    /// </summary>
+    /// <returns>Frames per second of the texture video</returns>
     public double GetVideoFrameRate()
     {
         if (IsOpen)
@@ -422,6 +478,10 @@ public class VolPlayer : MonoBehaviour
         return VolPluginInterface.VolGetFrameRate();
     }
 
+    /// <summary>
+    /// Get the number of image frames in the texture video
+    /// </summary>
+    /// <returns>The number of frames in the texture video</returns>
     public long GetVideoNumberOfFrames()
     {
         if (IsOpen)
@@ -433,6 +493,10 @@ public class VolPlayer : MonoBehaviour
         return VolPluginInterface.VolGetNumFrames();
     }
 
+    /// <summary>
+    /// Get the duration in seconds of the texture video
+    /// </summary>
+    /// <returns>The duration in seconds of the texture video</returns>
     public double GetVideoDuration()
     {
         if (IsOpen)
@@ -444,6 +508,10 @@ public class VolPlayer : MonoBehaviour
         return VolPluginInterface.VolGetDuration();
     }
 
+    /// <summary>
+    /// Get the size in bytes of an image from the texture video
+    /// </summary>
+    /// <returns>The size in bytes of an image from the texture video</returns>
     public long GetVideoFrameSize()
     {
         if (IsOpen)
@@ -455,6 +523,10 @@ public class VolPlayer : MonoBehaviour
         return VolPluginInterface.VolGetFrameSize();
     }
 
+    /// <summary>
+    /// Get the geometry data of the most recent read frame
+    /// </summary>
+    /// <returns>Struct containing the geometry data</returns>
     private VolPluginInterface.VolGeometryData? GetFrameData()
     {
         if (IsOpen)
@@ -466,6 +538,10 @@ public class VolPlayer : MonoBehaviour
         return VolPluginInterface.VolGeomGetPtrData();
     }
 
+    /// <summary>
+    /// Read the next geometry and texture frame
+    /// </summary>
+    /// <param name="dispose">True if the read data will be skipped</param>
     private void ReadNextFrame(bool dispose = false)
     {
         if (_frameCount >= _numFrames)
@@ -488,6 +564,10 @@ public class VolPlayer : MonoBehaviour
         _frameCount++;
     }
 
+    /// <summary>
+    /// Read and process a frame's geometry data
+    /// </summary>
+    /// <param name="frame">The frame to be read (-1 for next frame)</param>
     private void ReadNextGeom(int frame = -1)
     {
         string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
@@ -568,6 +648,10 @@ public class VolPlayer : MonoBehaviour
         nativeMeshData.Dispose();
     }
 
+    /// <summary>
+    /// Change the vologram's material in runtime 
+    /// </summary>
+    /// <param name="newMaterial">New material to be applied to the vologram</param>
     public void ChangeMaterial(Material newMaterial)
     {
         material = newMaterial;
