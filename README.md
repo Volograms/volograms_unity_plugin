@@ -4,6 +4,8 @@
 
 Prebuilt versions of the Unity plugins are packaged into a `unitypackage` file in the [releases page](https://github.com/Volograms/volograms_unity_plugin/releases).
 
+# Developer Guide
+
 This repo contains the projects to build the native Volograms player plugins for Unity. It also uses code taken from [this repository](https://bitbucket.org/volograms/vol_av/src/master/). Each platform has a separate project and each project contains a README that documents how to build their respective plugin. When a plugin is built, it is copied to the `UnityVol` folder, which can be dragged and dropped into Unity. 
 
 ## Platform Avaialble 
