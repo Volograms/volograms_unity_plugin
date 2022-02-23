@@ -16,7 +16,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "87CA4E7326A86BA000901D4F"
                BuildableName = "vol_unity_macos.bundle"
-               BlueprintName = "vol_unity_macos"
+               BlueprintName = "volplayer"
                ReferencedContainer = "container:vol_unity_macos.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -52,7 +52,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "87CA4E7326A86BA000901D4F"
             BuildableName = "vol_unity_macos.bundle"
-            BlueprintName = "vol_unity_macos"
+            BlueprintName = "volplayer"
             ReferencedContainer = "container:vol_unity_macos.xcodeproj">
          </BuildableReference>
       </MacroExpansion>

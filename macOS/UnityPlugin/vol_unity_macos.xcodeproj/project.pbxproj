@@ -30,7 +30,7 @@
 		871FC0DA26B2AE09002D6F50 /* vol_geom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vol_geom.h; sourceTree = "<group>"; };
 		87AC76D626AEC29100E2F9E1 /* vol_av.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vol_av.h; sourceTree = "<group>"; };
 		87AC76D726AEC29100E2F9E1 /* vol_av.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vol_av.c; sourceTree = "<group>"; };
-		87CA4E7426A86BA000901D4F /* vol_unity_macos.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = vol_unity_macos.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
+		87CA4E7426A86BA000901D4F /* volplayer.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = volplayer.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		87CA4E7726A86BA000901D4F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CDA24C8F278DA0CB00B646E9 /* vol_interface.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vol_interface.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -79,7 +79,7 @@
 		87CA4E7526A86BA000901D4F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				87CA4E7426A86BA000901D4F /* vol_unity_macos.bundle */,
+				87CA4E7426A86BA000901D4F /* volplayer.bundle */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		87CA4E7326A86BA000901D4F /* vol_unity_macos */ = {
+		87CA4E7326A86BA000901D4F /* volplayer */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 87CA4E7A26A86BA000901D4F /* Build configuration list for PBXNativeTarget "vol_unity_macos" */;
+			buildConfigurationList = 87CA4E7A26A86BA000901D4F /* Build configuration list for PBXNativeTarget "volplayer" */;
 			buildPhases = (
 				87CA4E7026A86BA000901D4F /* Sources */,
 				87CA4E7126A86BA000901D4F /* Frameworks */,
@@ -108,9 +108,9 @@
 			);
 			dependencies = (
 			);
-			name = vol_unity_macos;
+			name = volplayer;
 			productName = UnityPlugin;
-			productReference = 87CA4E7426A86BA000901D4F /* vol_unity_macos.bundle */;
+			productReference = 87CA4E7426A86BA000901D4F /* volplayer.bundle */;
 			productType = "com.apple.product-type.bundle";
 		};
 /* End PBXNativeTarget section */
@@ -140,7 +140,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				87CA4E7326A86BA000901D4F /* vol_unity_macos */,
+				87CA4E7326A86BA000901D4F /* volplayer */,
 			);
 		};
 /* End PBXProject section */
@@ -340,7 +340,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		87CA4E7A26A86BA000901D4F /* Build configuration list for PBXNativeTarget "vol_unity_macos" */ = {
+		87CA4E7A26A86BA000901D4F /* Build configuration list for PBXNativeTarget "volplayer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				87CA4E7B26A86BA000901D4F /* Debug */,
