@@ -35,6 +35,7 @@ To build the volplayer library for Android, you must have the [Android SDK Comma
 The volplayer Windows build is a Visual Studio project, and so you must be able to build such a project, for example, through [Visual Studio](https://visualstudio.microsoft.com/).
 
 ### FFmpeg
+
 The Volograms Unity SDK uses builds of [FFmpeg](https://www.ffmpeg.org/) created from the [ffmpeg-kit repo](https://github.com/tanersener/ffmpeg-kit). To start developing on the Volograms Unity SDK, clone the ffmpeg-kit repo and follow the instructions on the repo page to build ffmpeg for the platforms you want. 
 
 Next, open your terminal and add an environmental variable `FFMPEG_KIT` which should point to the root folder of your local ffmpeg-kit repo. For example:
@@ -52,3 +53,14 @@ The libraries are exported into the [`VologramsToolkit`](./VologramsToolkit/Plug
 After importing the plugin into Unity, ensure that the Unity settings for each plugin is correct. For example, we don't want to use the iOS plugin in a Mac build. 
 
 There is a utility script included in the Unity package that re-imports all the libraries into Unity with the correct settings. This can be done in Unity through the toolbar: `Volograms > Utils > Reimport Plugins > All`
+
+## Licence ##
+
+Copyright 2022, Volograms.
+
+* Source code included in this plugin is provided under the terms of the MIT licence (see the `LICENSE` file for details).
+
+### Dependencies
+
+* This software uses <a href=http://ffmpeg.org>FFmpeg</a> licensed under the <a href=http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>LGPLv2.1</a>.
+* The source code distribution, build instructions, and further licence details can be found at [ffmpeg-kit repo](https://github.com/tanersener/ffmpeg-kit)
