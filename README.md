@@ -13,7 +13,7 @@ Support is planned for M1 macOS and GNU/Linux builds.
 
 ## Getting Started
 
-* The easiest way to get started using is to download a pre-built plugin from the [Releases](https://github.com/Volograms/volograms_unity_plugin/releases) page.
+* The easiest way to get started is to download a pre-built plugin from the [Releases](https://github.com/Volograms/volograms_unity_plugin/releases) page.
 * If you would prefer to build the plugin from source, then you can clone this respository, and follow the [Developer Guide](#developer-guide).
 
 ## Unity Settings
