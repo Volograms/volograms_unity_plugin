@@ -20,7 +20,7 @@ Support is planned for M1 macOS and GNU/Linux builds.
 
 The libraries are exported into the [`VologramsToolkit`](./VologramsToolkit/Plugins/) folder. The `VologramsToolkit` folder can be imported directly into Unity. 
 
-After importing the plugin into Unity, ensure that the Unity settings for each plugin is correct. For example, we don't want to use the iOS plugin in a macOS build. 
+After importing the plugin into Unity, ensure that the Unity settings for each plugin are correct. For example, we don't want to use the iOS plugin in a macOS build. 
 
 There is a utility script included in the Unity package that re-imports all the libraries into Unity with the correct settings.
 This can be invoked in Unity through the toolbar: `Volograms > Utils > Reimport Plugins > All`.
