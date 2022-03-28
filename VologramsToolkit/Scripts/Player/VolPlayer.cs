@@ -40,7 +40,7 @@ public class VolPlayer : MonoBehaviour
     
     private string _fullGeomPath;
     private string _fullVideoPath;
-    private int _frameCount;
+    private int _currentFrameIndex;
     private int _numFrames;
     private bool _hasVideoTexture;
     private float _timeTracker;
@@ -58,7 +58,7 @@ public class VolPlayer : MonoBehaviour
 
     public bool IsOpen { get; private set; }
     public bool IsPlaying { get; private set; }
-    public int Frame => _frameCount;
+    public int Frame => _currentFrameIndex;
     public bool IsMuted => audioOn && _audioPlayer != null && _audioPlayer.GetDirectAudioMute(0);
     
     /// <summary>
@@ -217,7 +217,7 @@ public class VolPlayer : MonoBehaviour
             return false;
         }
 
-        _frameCount = 0;
+        _currentFrameIndex = 0;
         _numFrames = VolPluginInterface.VolGeomGetFrameCount(); 
         _secondsPerFrame = 1f / 30f;
 
@@ -340,13 +340,13 @@ public class VolPlayer : MonoBehaviour
         if (!IsOpen) 
             return;
         
-        if (_isSkipping || frame <= _frameCount)
+        if (_isSkipping || frame <= _currentFrameIndex)
             return;
 
         _isSkipping = true;
         Pause();
 
-        while (_frameCount < frame)
+        while (_currentFrameIndex < frame)
         {
             ReadNextFrame(true);
         }
@@ -396,7 +396,7 @@ public class VolPlayer : MonoBehaviour
             return false;
         }
 
-        _frameCount = 0;
+        _currentFrameIndex = 0;
 
         IsOpen = true;
         if (playOnStart)
@@ -544,7 +544,7 @@ public class VolPlayer : MonoBehaviour
     /// <param name="dispose">True if the read data will be skipped</param>
     private void ReadNextFrame(bool dispose = false)
     {
-        if (_frameCount >= _numFrames)
+        if (_currentFrameIndex >= _numFrames)
             return;
 
         _colorPtr = VolPluginInterface.VolReadNextFrame();
@@ -561,7 +561,7 @@ public class VolPlayer : MonoBehaviour
 #endif
         }
 
-        _frameCount++;
+        _currentFrameIndex++;
     }
 
     /// <summary>
