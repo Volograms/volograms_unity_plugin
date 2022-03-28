@@ -101,6 +101,7 @@ DllExport void clear_logging_functions( void ) {
     vol_geom_reset_log_callback();
 }
 
+#ifdef VOL_TEST_TIMERS
 static uint64_t _frequency = 1000000, _offset;
 
 void apg_time_init( void ) {
@@ -137,6 +138,7 @@ double apg_time_s( void ) {
   return (double)( counter - _offset ) / _frequency;
 #endif
 }
+#endif // VOL_TEST_TIMERS
 
 /**
  * Geometry file
@@ -264,7 +266,9 @@ DllExport bool native_vol_open_video_file(const char* filename)
 {
     memset( &video_file_ptr, 0, sizeof(vol_av_video_t));
     bool ret = vol_av_open(filename, &video_file_ptr);
+#ifdef VOL_TEST_TIMERS
     apg_time_init();
+#endif
     if ( ret ) {
         vol_av_dimensions( &video_file_ptr, &vid_w, &vid_h );
         vid_frm_rt = vol_av_frame_rate( &video_file_ptr );

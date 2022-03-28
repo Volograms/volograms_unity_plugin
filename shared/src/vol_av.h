@@ -3,7 +3,7 @@
  *
  * vol_av    | Audio-Video Decoding API
  * --------- | ----------
- * Version   | 0.8
+ * Version   | 0.9
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -24,6 +24,7 @@
  *
  * History
  * -----------
+ * - 0.9.0 (2022/03/23) - Added log reset from Unity plugin, multithreaded decoding, and tidied docs.
  * - 0.8.0 (2021/01/20) - Added customisable debug callback.
  * - 0.7.1 (2021/12/10) - Tidied comments.
  * - 0.7   (2021/10/15) - Updated copyright and licence notice.
@@ -78,6 +79,7 @@ typedef enum vol_av_log_type_t {
 } vol_av_log_type_t;
 
 VOL_AV_EXPORT void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str ) );
+
 VOL_AV_EXPORT void vol_av_reset_log_callback( void );
 
 /** Open a video file given by `filename`.

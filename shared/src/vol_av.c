@@ -1,7 +1,7 @@
 /** @file vol_av.c
  * Volograms SDK Audio-Video Decoding API
  *
- * Version:   0.8.0 \n
+ * Version:   0.9.0 \n
  * Authors:   Anton Gerdelan <anton@volograms.com> \n
  * Copyright: 2021, Volograms (http://volograms.com/) \n
  * Language:  C99 \n
@@ -44,17 +44,17 @@ static void _default_logger( vol_av_log_type_t log_type, const char* message_str
   fprintf( stream_ptr, "%s", message_str );
 }
 
-static void ( *_logger_ptr )( vol_av_log_type_t log_type, const char* message_str ) = &_default_logger;
+static void ( *_logger_ptr )( vol_av_log_type_t log_type, const char* message_str ) = _default_logger;
 
 // This function is used in this file as a printf-style logger. It converts that format to a simple string and passes it to _logger_ptr.
 static void _vol_loggerf( vol_av_log_type_t log_type, const char* message_str, ... ) {
+  if ( !_logger_ptr ) { return; }
   char log_str[VOL_AV_LOG_STR_MAX_LEN];
   log_str[0] = '\0';
   va_list arg_ptr; // using va_args lets us make sure any printf-style formatting values are properly written into the string.
   va_start( arg_ptr, message_str );
   vsnprintf( log_str, VOL_AV_LOG_STR_MAX_LEN - 1, message_str, arg_ptr );
   va_end( arg_ptr );
-  int len = strlen( log_str );
   _logger_ptr( log_type, log_str );
 }
 
@@ -147,6 +147,24 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
       return false;
     }
 
+#ifdef VOL_AV_THREADED
+    // multi-threading set-up ( called before avcodec_open2 ).
+    // This was 9 on Android and Windows desktop.
+    {
+      // 0 lets device choose number of threads.
+      p->codec_ctx_ptr->thread_count = 0;
+      // NOTE(Anton) don't use FF_THREAD_FRAME - it causes desync.
+      // https://ffmpeg.org/doxygen/3.2/structAVCodecContext.html#a7651614f4309122981d70e06a4b42fcb
+      /*  if ( p->codec_ptr->capabilities | AV_CODEC_CAP_FRAME_THREADS ) {
+          p->codec_ctx_ptr->thread_type = FF_THREAD_FRAME;*/
+      if ( p->codec_ptr->capabilities | AV_CODEC_CAP_SLICE_THREADS ) {
+        p->codec_ctx_ptr->thread_type = FF_THREAD_SLICE;
+      } else {
+        p->codec_ctx_ptr->thread_count = 1; // Don't use multithreading.
+      }
+    }
+#endif
+
     // Initialise the AVCodecContext to use the given AVCodec.
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
     if ( avcodec_open2( p->codec_ctx_ptr, p->codec_ptr, NULL ) < 0 ) {
@@ -166,7 +184,6 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
     p->output_frame_rgb_ptr->width  = p->codec_ctx_ptr->width;
     p->output_frame_rgb_ptr->height = p->codec_ctx_ptr->height;
 
-    // NOTE(Anton) This API is quite confusing
     // The allocated image buffer has to be freed by using av_freep(&pointers[0]).
     int align = 32;                        // NOTE(Anton) I haven no idea if this is correct!!
     int ret   = av_image_alloc(            //
@@ -181,14 +198,6 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
       _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: failed to allocate and set up output image buffer.\n" );
       return false;
     }
-    /* "Setup the data pointers and linesizes based on the specified image parameters and the provided array.
-    The fields of the given image are filled in by using the srcaddress which points to the image data buffer.
-    Depending on thespecified pixel format, one or multiple image data pointers andline sizes will be set.
-    If a planar format is specified, several pointers will be set pointing to the different picture planes and
-    the line sizes of the different planes will be stored in thelines_sizes array. Call with src == NULL to get the required
-    size for the src buffer.
-    To allocate the buffer and fill in the dst_data and dst_linesize in one call, use av_image_alloc()." */
-    // av_image_fill_arrays(); // NOTE(Anton) so i guess this means i don't need to call this function?
   } // endblock Allocate Frame Storage
 
   { // init SWS context for software scaling
@@ -248,7 +257,7 @@ static void _save_rgb_frame( vol_av_video_t* info_ptr ) {
   //   printf("[vol_av] DEBUG - frame wxh %ix%i linesize %i\n", info_ptr->w, info_ptr->h, p->output_frame_rgb_ptr->linesize[0] );
   // Convert the image from its native format to RGB
   sws_scale( p->sws_conv_ctx_ptr,                     // context.
-    (uint8_t const* const*)p->output_frame_ptr->data, // src slice. NOTE(Anton) Pedantic const cast required.
+    (uint8_t const* const*)p->output_frame_ptr->data, // src slice.
     p->output_frame_ptr->linesize,                    // src stride.
     0,                                                // slice y.
     info_ptr->h,                                      // slice h.
@@ -271,8 +280,8 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
   * Return codes such as AVERROR_EOF and AVERROR( EAGAIN ) are negative return codes, but not necessarily errors. We still need to decode packets left behind
   after finding EOF, and there may be additional trailing packets that need processing after finding EOF.
   * All /other/ negative values are errors.
-  * The first few frame reads often produce EAGAIN codes, meaning we need to call frame read again to buffer the full frame of packets (otherwise the first few
-  frames of the video sequence are blank).
+  * The first few frame reads often produce EAGAIN codes, meaning we need to call frame read again to buffer the full frame of packets (otherwise the first
+  few frames of the video sequence are blank).
   * This is IMO an error-prone error handling API design and lots of examples/tutorials misunderstand this and end up dropping the last few frames in a video.
   * A better video processing API would handle these states internally, not require the programmer to call 'read_frame' an unpredictable number of times in
   order to read a frame, and then loop over unknown numbers of packets that spit out unreliably.
@@ -301,9 +310,11 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
     }
     // NOTE(Anton) i think this is always true >=0 at this point.
     if ( response >= 0 ) {
+#ifdef VOL_AV_DEBUG_EXTRA
       _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Frame %d (type=%c, size=%d bytes, format=%d) pts %d key_frame %d [DTS %d]\n", p->codec_ctx_ptr->frame_number,
         av_get_picture_type_char( p->output_frame_ptr->pict_type ), p->output_frame_ptr->pkt_size, p->output_frame_ptr->format, p->output_frame_ptr->pts,
         p->output_frame_ptr->key_frame, p->output_frame_ptr->coded_picture_number );
+#endif
       _save_rgb_frame( info_ptr );
       return response;
     }
@@ -426,10 +437,8 @@ double vol_av_duration_s( const vol_av_video_t* info_ptr ) {
 
 //
 //
-void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str ) ) {
-  _logger_ptr = user_function_ptr;
-}
+void vol_av_set_log_callback( void ( *user_function_ptr )( vol_av_log_type_t log_type, const char* message_str ) ) { _logger_ptr = user_function_ptr; }
 
-void vol_av_reset_log_callback( void ) { 
-  _logger_ptr = &_default_logger;
-}
+//
+//
+void vol_av_reset_log_callback( void ) { _logger_ptr = _default_logger; }
