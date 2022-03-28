@@ -122,7 +122,7 @@ public class VolPluginInterface
     public static extern long VolGetFrameSize();
 
     [DllImport(DLL, EntryPoint = "native_vol_read_next_frame")]
-    public static extern IntPtr VolReadNextFrame();
+    public static extern IntPtr VolReadNextFrame(bool flipVertical);
 
     //[DllImport(DLL, EntryPoint = "get_texture_update_callback")]
     //private static extern System.IntPtr GetTextureUpdateCallback();

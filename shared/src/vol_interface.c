@@ -374,10 +374,10 @@ static void _image_flip_vertical( uint8_t* bytes_ptr, int width, int height, int
 /** Read the next frame of the video
  @returns   Pointer to the video frame pixel data
  */
-DllExport uint8_t * native_vol_read_next_frame(void)
+DllExport uint8_t * native_vol_read_next_frame( bool flip_vertical )
 {
     vol_av_read_next_frame( &video_file_ptr );
-    _image_flip_vertical(video_file_ptr.pixels_ptr, vid_w, vid_h, 3);
+    if ( flip_vertical ) { _image_flip_vertical(video_file_ptr.pixels_ptr, vid_w, vid_h, 3); }
     return video_file_ptr.pixels_ptr;
 }
     
