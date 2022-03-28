@@ -30,6 +30,7 @@
 
 #include "vol_av.h"
 #include "vol_geom.h"
+#include "vol_util.h"
 
 #ifdef _WIN32
 #define DllExport __declspec (dllexport)
@@ -49,9 +50,17 @@ extern "C"
 #include "IUnityRenderingExtensions.h"
 #endif
 
+typedef enum vol_interface_log_type_t {
+  VOL_INTERFACE_LOG_TYPE_INFO = 0, //
+  VOL_INTERFACE_LOG_TYPE_DEBUG,
+  VOL_INTERFACE_LOG_TYPE_WARNING,
+  VOL_INTERFACE_LOG_TYPE_ERROR,
+  VOL_INTERFACE_LOG_STR_MAX_LEN // Not an error type, just used to count the error types.
+} vol_interface_log_type_t;
+
 //  Unity logging taken from: https://stackoverflow.com/questions/43732825/use-debug-log-from-c 
 /** Unity logging callback type */
-typedef void( *vol_interface_log_callback )( int type, const char* message );
+typedef void( *vol_interface_log_callback )( vol_interface_log_type_t type, const char* message );
 typedef void( *vol_geom_log_callback )( vol_geom_log_type_t type, const char* message );
 typedef void( *vol_av_log_callback )( vol_av_log_type_t type, const char* message ); 
 
@@ -72,7 +81,7 @@ static bool _str_to_logfile( const char* str ) {
  @param color       Color of the text
  @param size        Size of the message in bytes
  */
-void default_print( int type, const char* message )
+void default_print( vol_interface_log_type_t type, const char* message )
 {
     _str_to_logfile(message);
 }
@@ -85,6 +94,7 @@ static vol_interface_log_callback log_callback = default_print;
  */
 DllExport void register_debug_callback( vol_interface_log_callback cb ) {
     log_callback = cb;
+    log_callback( VOL_INTERFACE_LOG_TYPE_INFO, "Set interface logging function" );
 }
 
 DllExport void register_geom_log_callback( vol_geom_log_callback cb ) {
@@ -96,46 +106,10 @@ DllExport void register_av_log_callback( vol_av_log_callback cb ) {
 }
 
 DllExport void clear_logging_functions( void ) {
+    log_callback( VOL_INTERFACE_LOG_TYPE_INFO, "Clearing interface logging function" );
     log_callback = default_print;
     vol_av_reset_log_callback();
     vol_geom_reset_log_callback();
-}
-
-static uint64_t _frequency = 1000000, _offset;
-
-void apg_time_init( void ) {
-#ifdef _WIN32
-  uint64_t counter;
-  _frequency = 1000; // QueryPerformanceCounter default
-  QueryPerformanceFrequency( (LARGE_INTEGER*)&_frequency );
-  QueryPerformanceCounter( (LARGE_INTEGER*)&_offset );
-#elif __APPLE__
-  mach_timebase_info_data_t info;
-  mach_timebase_info( &info );
-  _frequency       = ( info.denom * 1e9 ) / info.numer;
-  _offset          = mach_absolute_time();
-#else
-  _frequency = 1000000000; // nanoseconds
-  struct timespec ts;
-  clock_gettime( CLOCK_MONOTONIC, &ts );
-  _offset = (uint64_t)ts.tv_sec * (uint64_t)_frequency + (uint64_t)ts.tv_nsec;
-#endif
-}
-
-double apg_time_s( void ) {
-#ifdef _WIN32
-  uint64_t counter = 0;
-  QueryPerformanceCounter( (LARGE_INTEGER*)&counter );
-  return (double)( counter - _offset ) / _frequency;
-#elif __APPLE__
-  uint64_t counter = mach_absolute_time();
-  return (double)( counter - _offset ) / _frequency;
-#else
-  struct timespec ts;
-  clock_gettime( CLOCK_MONOTONIC, &ts );
-  uint64_t counter = (uint64_t)ts.tv_sec * (uint64_t)_frequency + (uint64_t)ts.tv_nsec;
-  return (double)( counter - _offset ) / _frequency;
-#endif
 }
 
 /**
@@ -164,7 +138,8 @@ DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* s
         
     memset( &geom_frame_data, 0, sizeof(vol_geom_frame_data_t));
     curr_geom_frame = 0;
-    
+    apg_time_init();
+
     return true;
 }
 
@@ -208,8 +183,16 @@ DllExport bool native_vol_read_next_geom_frame(const char* seq_filename)
 {
     if ( curr_geom_frame >= geom_file_ptr.hdr.frame_count )
         return false;
+
+    char log_string[100];
+    double read_time_start = apg_time_s();
+
     bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, curr_geom_frame, &geom_frame_data );
     curr_geom_frame++;
+
+    sprintf( log_string, "read geom frame time: %f ms", ( apg_time_s() - read_time_start ) * 1000.0f );
+    log_callback(VOL_INTERFACE_LOG_TYPE_DEBUG, log_string);
+
     return ret;
 }
 
@@ -264,7 +247,7 @@ DllExport bool native_vol_open_video_file(const char* filename)
 {
     memset( &video_file_ptr, 0, sizeof(vol_av_video_t));
     bool ret = vol_av_open(filename, &video_file_ptr);
-    apg_time_init();
+
     if ( ret ) {
         vol_av_dimensions( &video_file_ptr, &vid_w, &vid_h );
         vid_frm_rt = vol_av_frame_rate( &video_file_ptr );
@@ -350,21 +333,28 @@ DllExport int64_t native_vol_get_video_frame_size(void)
  * @param bytes_per_pixel   Number of bytes in a single pixel
  */
 static void _image_flip_vertical( uint8_t* bytes_ptr, int width, int height, int bytes_per_pixel ) {
-  if ( !bytes_ptr || 0 == height ) { return; } // invalid image
-  int row_stride = width * bytes_per_pixel;
-  // probably an invalid param/massive image - this could cause stack overflow in alloca().
-  if ( row_stride <= 0 || row_stride > 1024 * 1024 ) { return; }
-  // allocate fast *stack* memory for doing the copy
-  uint8_t* tmp_row_ptr = (uint8_t *) alloca( row_stride );
-  // go half way down image and swap with opposing row
-  for ( int i = 0; i < height / 2; i++ ) {                       // so if height == 5 only go to 0 and 1, and ignore 3.
-    int mirror_i            = height - 1 - i;                    // index of row we want to swap with
-    uint8_t* row_ptr        = &bytes_ptr[i * row_stride];        // address of our row in memory
-    uint8_t* mirror_row_ptr = &bytes_ptr[mirror_i * row_stride]; // address of opposite row (bottom half)
-    memcpy( tmp_row_ptr, row_ptr, row_stride );                  // our row -> tmp
-    memcpy( row_ptr, mirror_row_ptr, row_stride );               // row on other side -> our row
-    memcpy( mirror_row_ptr, tmp_row_ptr, row_stride );           // tmp -> row on other side
-  }
+    if ( !bytes_ptr || 0 == height ) { return; } // invalid image
+    int row_stride = width * bytes_per_pixel;
+    // probably an invalid param/massive image - this could cause stack overflow in alloca().
+    if ( row_stride <= 0 || row_stride > 1024 * 1024 ) { return; }
+
+    char log_string[100];
+    double read_time_start = apg_time_s();
+
+    // allocate fast *stack* memory for doing the copy
+    uint8_t* tmp_row_ptr = (uint8_t *) alloca( row_stride );
+    // go half way down image and swap with opposing row
+    for ( int i = 0; i < height / 2; i++ ) {                       // so if height == 5 only go to 0 and 1, and ignore 3.
+        int mirror_i            = height - 1 - i;                    // index of row we want to swap with
+        uint8_t* row_ptr        = &bytes_ptr[i * row_stride];        // address of our row in memory
+        uint8_t* mirror_row_ptr = &bytes_ptr[mirror_i * row_stride]; // address of opposite row (bottom half)
+        memcpy( tmp_row_ptr, row_ptr, row_stride );                  // our row -> tmp
+        memcpy( row_ptr, mirror_row_ptr, row_stride );               // row on other side -> our row
+        memcpy( mirror_row_ptr, tmp_row_ptr, row_stride );           // tmp -> row on other side
+    }
+
+    sprintf( log_string, "image flip time: %f ms", ( apg_time_s() - read_time_start ) * 1000.0f );
+    log_callback(VOL_INTERFACE_LOG_TYPE_DEBUG, log_string);
 }
 
 /** Read the next frame of the video
@@ -372,7 +362,12 @@ static void _image_flip_vertical( uint8_t* bytes_ptr, int width, int height, int
  */
 DllExport uint8_t * native_vol_read_next_frame(void)
 {
+    char log_string[100];
+    double read_time_start = apg_time_s();
     vol_av_read_next_frame( &video_file_ptr );
+    sprintf( log_string, "read video frame time: %f ms", ( apg_time_s() - read_time_start ) * 1000.0f );
+    log_callback(VOL_INTERFACE_LOG_TYPE_DEBUG, log_string);
+
     _image_flip_vertical(video_file_ptr.pixels_ptr, vid_w, vid_h, 3);
     return video_file_ptr.pixels_ptr;
 }

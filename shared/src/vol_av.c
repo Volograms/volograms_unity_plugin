@@ -9,6 +9,7 @@
  */
 
 #include "vol_av.h"
+#include "vol_util.h"
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h> // av_image_get_buffer_size()
@@ -147,6 +148,17 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
       return false;
     }
 
+    // set codec to automatically determine how many threads suits best for the decoding job
+    p->codec_ctx_ptr->thread_count = 8;
+
+    if (p->codec_ptr->capabilities | AV_CODEC_CAP_FRAME_THREADS)
+      p->codec_ctx_ptr->thread_type = FF_THREAD_FRAME;
+    else 
+    if (p->codec_ptr->capabilities | AV_CODEC_CAP_SLICE_THREADS)
+      p->codec_ctx_ptr->thread_type = FF_THREAD_SLICE;
+    else
+      p->codec_ctx_ptr->thread_count = 1; //don't use multithreading
+
     // Initialise the AVCodecContext to use the given AVCodec.
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
     if ( avcodec_open2( p->codec_ctx_ptr, p->codec_ptr, NULL ) < 0 ) {
@@ -154,6 +166,8 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
       return false;
     }
   } // endblock Video Codec Context
+
+  _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Threads: %d\n", p->codec_ctx_ptr->thread_count );
 
   { // Allocate Frame Storage
     p->output_frame_ptr     = av_frame_alloc();
@@ -209,6 +223,8 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
       NULL, NULL, NULL                    // filters and param
     );
   } // endblock init SWS context
+
+  apg_time_init();
   return true;
 }
 
@@ -247,6 +263,7 @@ static void _save_rgb_frame( vol_av_video_t* info_ptr ) {
   info_ptr->h = p->output_frame_ptr->height;
   //   printf("[vol_av] DEBUG - frame wxh %ix%i linesize %i\n", info_ptr->w, info_ptr->h, p->output_frame_rgb_ptr->linesize[0] );
   // Convert the image from its native format to RGB
+  double time_0 = apg_time_s();
   sws_scale( p->sws_conv_ctx_ptr,                     // context.
     (uint8_t const* const*)p->output_frame_ptr->data, // src slice. NOTE(Anton) Pedantic const cast required.
     p->output_frame_ptr->linesize,                    // src stride.
@@ -255,6 +272,8 @@ static void _save_rgb_frame( vol_av_video_t* info_ptr ) {
     p->output_frame_rgb_ptr->data,                    // dst.
     p->output_frame_rgb_ptr->linesize                 // dst stride.
   );
+  double time_1 = apg_time_s();
+  _vol_loggerf(VOL_AV_LOG_TYPE_DEBUG, "sws_scale time: %f", ((time_1 - time_0) * 1000));
   // Remember that you can cast an AVFrame pointer to an AVPicture pointer.
   // can now save or use this data and increment frame counter
   info_ptr->pixels_ptr = p->output_frame_rgb_ptr->data[0]; // [0] is the first (red) channel. output usually has 3 but can have 4 channels.
@@ -279,8 +298,14 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
   * -- Anton.
   */
 
+ double time_0, time_1;
+
   // Supply raw packet data as input to a decoder
+  //time_0 = apg_time_s();
   int response = avcodec_send_packet( p->codec_ctx_ptr, packet_ptr ); // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
+  //time_1 = apg_time_s();
+  //_vol_loggerf(VOL_AV_LOG_TYPE_DEBUG, "avcodec_send_packet time: %f", ((time_1 - time_0) * 1000));
+
   if ( response < 0 && response != AVERROR_EOF ) {
     _vol_loggerf( VOL_AV_LOG_TYPE_ERROR, "ERROR: while sending a packet to the decoder: %s\n", av_err2str( response ) );
     return response;
@@ -292,7 +317,10 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
 
   while ( ( response >= 0 || response == AVERROR_EOF ) && ( overflow_retry_count < overflow_retry_limit ) ) {
     // Return decoded output data (into a frame) from a decoder
+    //time_0 = apg_time_s();
     response = avcodec_receive_frame( p->codec_ctx_ptr, p->output_frame_ptr ); // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga11e6542c4e66d3028668788a1a74217c
+    //time_1 = apg_time_s();
+    //_vol_loggerf(VOL_AV_LOG_TYPE_DEBUG, "avcodec_receive_frame time: %f", ((time_1 - time_0) * 1000));
     if ( response == AVERROR( EAGAIN ) ) {                                     //|| response == AVERROR_EOF
       return response;
     } else if ( response < 0 && response != AVERROR_EOF ) {
@@ -301,10 +329,15 @@ static int _decode_packet( vol_av_video_t* info_ptr, AVPacket* packet_ptr ) {
     }
     // NOTE(Anton) i think this is always true >=0 at this point.
     if ( response >= 0 ) {
-      _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Frame %d (type=%c, size=%d bytes, format=%d) pts %d key_frame %d [DTS %d]\n", p->codec_ctx_ptr->frame_number,
-        av_get_picture_type_char( p->output_frame_ptr->pict_type ), p->output_frame_ptr->pkt_size, p->output_frame_ptr->format, p->output_frame_ptr->pts,
-        p->output_frame_ptr->key_frame, p->output_frame_ptr->coded_picture_number );
+#ifdef VOL_AV_DEBUG
+      //_vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Frame %d (type=%c, size=%d bytes, format=%d) pts %d key_frame %d [DTS %d]\n", p->codec_ctx_ptr->frame_number,
+      //  av_get_picture_type_char( p->output_frame_ptr->pict_type ), p->output_frame_ptr->pkt_size, p->output_frame_ptr->format, p->output_frame_ptr->pts,
+      //  p->output_frame_ptr->key_frame, p->output_frame_ptr->coded_picture_number );
+#endif
+      //time_0 = apg_time_s();
       _save_rgb_frame( info_ptr );
+      //time_1 = apg_time_s();
+      //_vol_loggerf(VOL_AV_LOG_TYPE_DEBUG, "_save_rgb_frame time: %f", ((time_1 - time_0) * 1000));
       return response;
     }
     overflow_retry_count++;
@@ -332,12 +365,22 @@ bool vol_av_read_next_frame( vol_av_video_t* info_ptr ) {
   // fill the Packet with data from the Stream
   // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga4fdb3084415a82e3810de6ee60e46a61
 
+  double time_0;
+  double time_1;
+
   // Try a few times, in case there are dangling packets at the beginning or end of file to clean up. -- Anton.
   for ( int i = 0; i < 8; i++ ) {
-    if ( av_read_frame( p->fmt_ctx_ptr, packet_ptr ) >= 0 ) {
+    time_0 = apg_time_s();
+    int read_frame_result = av_read_frame( p->fmt_ctx_ptr, packet_ptr );
+    time_1 = apg_time_s();
+    _vol_loggerf(VOL_AV_LOG_TYPE_DEBUG, "av read frame time (%d): %f", i, ((time_1 - time_0) * 1000));
+    if ( read_frame_result >= 0 ) {
       // if it's the video stream
       if ( packet_ptr->stream_index == p->video_stream_idx ) {
+        time_0 = apg_time_s();
         packet_response = _decode_packet( info_ptr, packet_ptr );
+        time_1 = apg_time_s();
+        _vol_loggerf(VOL_AV_LOG_TYPE_DEBUG, "decode packet time (%d): %f", i, ((time_1 - time_0) * 1000));
         if ( packet_response == AVERROR( EAGAIN ) || packet_response == AVERROR_EOF ) {
           av_packet_unref( packet_ptr );
           continue;
@@ -347,7 +390,10 @@ bool vol_av_read_next_frame( vol_av_video_t* info_ptr ) {
       }      // endwhile
     } else { // maybe there are some leftover packets from last read
       if ( packet_ptr->stream_index == p->video_stream_idx ) {
+        time_0 = apg_time_s();
         packet_response = _decode_packet( info_ptr, packet_ptr );
+        time_1 = apg_time_s();
+        _vol_loggerf(VOL_AV_LOG_TYPE_DEBUG, "decode packet time (%d): %f", i, ((time_1 - time_0) * 1000));
         if ( packet_response == AVERROR( EAGAIN ) || packet_response == AVERROR_EOF ) {
           av_packet_unref( packet_ptr );
           continue;

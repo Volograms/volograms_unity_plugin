@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "mach_time.h": "c",
+        "stdio.h": "c"
+    }
+}
