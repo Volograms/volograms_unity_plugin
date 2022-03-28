@@ -7,13 +7,16 @@
 
 using UnityEditor;
 using UnityEditor.Callbacks;
+#if UNITY_IOS
 using UnityEditor.iOS.Xcode;
+#endif // UNITY_IOS
 
 /// <summary>
 /// Class for post Unity-build functions
 /// </summary>
 public class VolPostBuild
 {
+#if UNITY_IOS
     private const string VideoToolbox = "VideoToolbox.framework";
     private const string LibZ = "libz.tbd";
     private const string LibBz2 = "libbz2.tbd";
@@ -55,4 +58,5 @@ public class VolPostBuild
             }
         }
     }
+#endif // UNITY_IOS
 }
