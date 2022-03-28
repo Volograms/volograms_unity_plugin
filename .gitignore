@@ -1,1 +1,3 @@
 VologramsToolkit/Plugins/*
+UnityVol/Plugins/x64/vol_unity_lib_win.dll
+windows/vol_unity_lib_win/vol_unity_lib_win/vol_unity_lib_win.vcxproj
