@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.7.1
+ * Version   | 0.9
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -21,6 +21,7 @@
  *
  * History
  * -------
+ * - 0.9.0 (2022/03/22) - Version bump for parity with vol_av.
  * - 0.7.1 (2021/01/24) - New option streaming_mode paramter to vol_geom_create_file_info().
  *                        Set to false for typical phone captures to pre-load the sequence file to reduce disk I/O at run-time.
  * - 0.7.0 (2021/01/20) - Added customisable debug callback.

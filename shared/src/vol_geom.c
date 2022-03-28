@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.7.1
+ * Version   | 0.9
  * Authors   | Anton Gerdelan <anton@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -29,7 +29,7 @@ static void _default_logger( vol_geom_log_type_t log_type, const char* message_s
   fprintf( stream_ptr, "%s", message_str );
 }
 
-static void ( *_logger_ptr )( vol_geom_log_type_t log_type, const char* message_str ) = &_default_logger;
+static void ( *_logger_ptr )( vol_geom_log_type_t log_type, const char* message_str ) = _default_logger;
 
 // This function is used in this file as a printf-style logger. It converts that format to a simple string and passes it to _logger_ptr.
 static void _vol_loggerf( vol_geom_log_type_t log_type, const char* message_str, ... ) {
@@ -39,7 +39,6 @@ static void _vol_loggerf( vol_geom_log_type_t log_type, const char* message_str,
   va_start( arg_ptr, message_str );
   vsnprintf( log_str, VOL_GEOM_LOG_STR_MAX_LEN - 1, message_str, arg_ptr );
   va_end( arg_ptr );
-  int len = strlen( log_str );
   _logger_ptr( log_type, log_str );
 }
 
@@ -530,10 +529,6 @@ int vol_geom_find_previous_keyframe( const vol_geom_info_t* info_ptr, int frame_
   return -1;
 }
 
-void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str ) ) {
-  _logger_ptr = user_function_ptr;
-}
+void vol_geom_set_log_callback( void ( *user_function_ptr )( vol_geom_log_type_t log_type, const char* message_str ) ) { _logger_ptr = user_function_ptr; }
 
-void vol_geom_reset_log_callback( void ) {
-  _logger_ptr = &_default_logger;
-}
+void vol_geom_reset_log_callback( void ) { _logger_ptr = _default_logger; }
