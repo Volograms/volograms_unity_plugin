@@ -148,8 +148,6 @@ double apg_time_s( void ) {
 static vol_geom_info_t geom_file_ptr;
 /** Struct containing read geometry data */
 static vol_geom_frame_data_t geom_frame_data;
-/** Track the index number of the loaded geometry frame */
-static int curr_geom_frame;
 
 /** Open the geometry file
  @param hdr_filename    Path to the header file
@@ -165,7 +163,6 @@ DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* s
         return opened;
         
     memset( &geom_frame_data, 0, sizeof(vol_geom_frame_data_t));
-    curr_geom_frame = 0;
     
     return true;
 }
@@ -187,7 +184,7 @@ DllExport int native_vol_get_geom_frame_count(void)
     return geom_file_ptr.hdr.frame_count;
 }
 
-/** Reads the next geometry frame
+/** Reads the specified geometry frame
  @param seq_filename    The path to the geometry file
  @param frame           Index of the frame you want to read
  @returns               If the operation was a success
@@ -198,29 +195,21 @@ DllExport bool native_vol_read_geom_frame(const char* seq_filename, int frame)
         return false;
 
     bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, frame, &geom_frame_data );
-    curr_geom_frame = frame;
     return ret; 
 }
 
-/** Reads the next geometry frame
- @param seq_filename    The path to the geometry file
- @returns               If the operation was a success
+/**
+ * @returns Returns true if the given frame_idx is valid and is also a keyframe, in the currently opened vologram's geometry.
  */
-DllExport bool native_vol_read_next_geom_frame(const char* seq_filename)
-{
-    if ( curr_geom_frame >= geom_file_ptr.hdr.frame_count )
-        return false;
-    bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, curr_geom_frame, &geom_frame_data );
-    curr_geom_frame++;
-    return ret;
+DllExport bool native_vol_geom_is_keyframe( int frame_idx ) {
+    return vol_geom_is_keyframe( &geom_file_ptr, frame_idx );
 }
 
-/** Get the index of the next frame to be loaded
- @returns   The index of the geometry frame to be loaded next
+/**
+ * @returns Returns the index of the keyframe prior to frame_idx, in the currently opened vologram's geometry.
  */
-DllExport int native_vol_get_next_geom_frame_index(void)
-{
-    return curr_geom_frame;
+DllExport int native_vol_geom_find_previous_keyframe( int frame_idx ) {
+    return vol_geom_find_previous_keyframe( &geom_file_ptr, frame_idx );
 }
 
 /** Get the geometry data of the current loaded frame
@@ -246,17 +235,15 @@ DllExport vol_geom_info_t native_vol_get_geom_info(void)
 /** Struct containing details of the loaded video file */
 static vol_av_video_t video_file_ptr;
 /** The pixel width of the loaded video */
-static int vid_w = -1;
-/** The pixel width of the loaded video */
-static int vid_h = -1;
-/** The frame rate of the loaded video */
-static double vid_frm_rt = -1;
+static int vid_w = 0;
+/** The pixel height of the loaded video */
+static int vid_h = 0;
 /** The duration in seconds of the loaded video */
-static double vid_dur = -1;
+static double vid_dur = 0.0;
 /** The number of frames in the loaded video */
-static int64_t vid_num_frms = -1;
+static int64_t vid_num_frms = 0;
 /** The number of bytes in a single from of the loaded video */
-static int vid_frm_size = -1;
+static int vid_frm_size = 0;
 
 /** Open the video texture file for a vologram
  @param filename    Path to the video texture file
@@ -271,7 +258,6 @@ DllExport bool native_vol_open_video_file(const char* filename)
 #endif
     if ( ret ) {
         vol_av_dimensions( &video_file_ptr, &vid_w, &vid_h );
-        vid_frm_rt = vol_av_frame_rate( &video_file_ptr );
         vid_num_frms = vol_av_frame_count( &video_file_ptr );
         vid_dur = vol_av_duration_s( &video_file_ptr );
         vid_frm_size = vid_w * vid_h * 3;
@@ -285,12 +271,11 @@ DllExport bool native_vol_open_video_file(const char* filename)
  */
 DllExport bool native_vol_close_video_file(void)
 {
-    vid_w = -1;
-    vid_h = -1;
-    vid_frm_rt = -1;
-    vid_dur = -1;
-    vid_num_frms = -1;
-    vid_frm_size = -1;
+    vid_w = 0;
+    vid_h = 0;
+    vid_dur = 0.0;
+    vid_num_frms = 0;
+    vid_frm_size = 0;
     return vol_av_close( &video_file_ptr );
 }
 
@@ -315,7 +300,8 @@ DllExport int native_vol_get_video_height(void)
  */
 DllExport double native_vol_get_video_frame_rate(void)
 {
-    return vid_frm_rt;
+    // It's safer to check on demand because this can change during playback.
+    return vol_av_frame_rate( &video_file_ptr );
 }
 
 /** Get the number of frames in the video
@@ -374,7 +360,7 @@ static void _image_flip_vertical( uint8_t* bytes_ptr, int width, int height, int
 /** Read the next frame of the video
  @returns   Pointer to the video frame pixel data
  */
-DllExport uint8_t * native_vol_read_next_frame( bool flip_vertical )
+DllExport uint8_t * native_vol_read_next_video_frame( bool flip_vertical )
 {
     vol_av_read_next_frame( &video_file_ptr );
     if ( flip_vertical ) { _image_flip_vertical(video_file_ptr.pixels_ptr, vid_w, vid_h, 3); }
