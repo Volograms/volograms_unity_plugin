@@ -83,12 +83,15 @@ public class VolPluginInterface
 
     [DllImport(DLL, EntryPoint = "native_vol_get_geom_frame_count")]
     public static extern int VolGeomGetFrameCount();
-
-    [DllImport(DLL, EntryPoint = "native_vol_read_next_geom_frame")]
-    public static extern bool VolGeomReadNextFrame(string sequenceFile);
     
     [DllImport(DLL, EntryPoint = "native_vol_read_geom_frame")]
     public static extern bool VolGeomReadFrame(string sequenceFile, int frame);
+
+    [DllImport(DLL, EntryPoint = "native_vol_geom_is_keyframe")]
+    public static extern bool VolGeomIsKeyframe(int frame);
+
+    [DllImport(DLL, EntryPoint = "native_vol_geom_find_previous_keyframe")]
+    public static extern int VolGeomFindPreviousKeyframe(int frame);
 
     [DllImport(DLL, EntryPoint = "native_vol_get_next_geom_frame_index")]
     public static extern int VolGeomGetNextFrameIndex();
@@ -121,8 +124,8 @@ public class VolPluginInterface
     [DllImport(DLL, EntryPoint = "native_vol_get_video_frame_size")]
     public static extern long VolGetFrameSize();
 
-    [DllImport(DLL, EntryPoint = "native_vol_read_next_frame")]
-    public static extern IntPtr VolReadNextFrame(bool flipVertical);
+    [DllImport(DLL, EntryPoint = "native_vol_read_next_video_frame")]
+    public static extern IntPtr VolReadNextVideoFrame(bool flipVertical);
 
     //[DllImport(DLL, EntryPoint = "get_texture_update_callback")]
     //private static extern System.IntPtr GetTextureUpdateCallback();
