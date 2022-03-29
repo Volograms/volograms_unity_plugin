@@ -93,9 +93,6 @@ public class VolPluginInterface
     [DllImport(DLL, EntryPoint = "native_vol_geom_find_previous_keyframe")]
     public static extern int VolGeomFindPreviousKeyframe(int frame);
 
-    [DllImport(DLL, EntryPoint = "native_vol_get_next_geom_frame_index")]
-    public static extern int VolGeomGetNextFrameIndex();
-
     [DllImport(DLL, EntryPoint = "native_vol_get_geom_ptr_data")]
     public static extern VolGeometryData VolGeomGetPtrData();
 
