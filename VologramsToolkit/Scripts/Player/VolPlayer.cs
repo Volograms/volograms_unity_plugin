@@ -44,8 +44,8 @@ public class VolPlayer : MonoBehaviour
     private int _numFrames;
     private bool _hasVideoTexture;
     // When an animation starts this value is 0. When the last frame is played it is == video duration. On loop it resets to zero.
-    private float _animationAccumulatedSeconds;
-    private float _secondsPerFrame;
+    private double _animationAccumulatedSeconds;
+    private double _secondsPerFrame;
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
     private ushort[] _keyShortIndices;
@@ -109,19 +109,19 @@ public class VolPlayer : MonoBehaviour
         
         // Work out the frame index to play based on elapsed animation time. This lets us skip to the correct frame when the player is going slowly.
         _animationAccumulatedSeconds += Time.deltaTime;
-        int desiredFrameIndex = _animationAccumulatedSeconds / _secondsPerFrame;
+        int desiredFrameIndex = (int)(_animationAccumulatedSeconds / _secondsPerFrame);
         // Not enough time has passed to advance to the next frame yet.
         if ( desiredFrameIndex == _currentFrameIndex ) { return; }
 
-        if (VolPluginInterface.VolGeomGetNextFrameIndex() >= _numFrames || desiredFrameIndex >= _numFrames )
+        if (desiredFrameIndex >= _numFrames )
         {
             if (isLooping)
             {
                 Restart();
-                return;
+            } else {
+                IsPlaying = false;
+                Close();
             }
-            IsPlaying = false;
-            Close();
             return;
         }
         // Always skip video frames to desired frame.
@@ -220,8 +220,9 @@ public class VolPlayer : MonoBehaviour
 
         _currentFrameIndex = 0;
         _animationAccumulatedSeconds = 0f;
-        _numFrames = VolPluginInterface.VolGeomGetFrameCount(); 
-        _secondsPerFrame = 1f / 30f; // NOTE(Anton) -- we should fetch this from vol_av rather than rely on 30fps.
+        _numFrames = VolPluginInterface.VolGeomGetFrameCount();
+        double fps = VolPluginInterface.VolGetFrameRate();
+        _secondsPerFrame = 1f / fps; // TODO(Anton) -- we should fetch this from vol_av rather than rely on 30fps.
 
         _voloTexture = new Texture2D(
             VolPluginInterface.VolGetVideoWidth(),
@@ -416,12 +417,19 @@ public class VolPlayer : MonoBehaviour
             return;
         
         playOnStart = false;
-        if (VolPluginInterface.VolGeomGetNextFrameIndex() >= _numFrames)
+
+        int desiredFrameIndex = _currentFrameIndex + 1;
+        if (desiredFrameIndex >= _numFrames )
         {
-            Restart();
+            if (isLooping)
+            {
+                Restart();
+            }
+            return;
         }
-        ReadNextFrame();
-        ReadNextGeom();
+        // Always skip video frames to desired frame.
+        ReadVideoFrame(_currentFrameIndex, desiredFrameIndex);
+        ReadGeomFrame(_currentFrameIndex, desiredFrameIndex);
     }
 
     /// <summary>
@@ -542,7 +550,7 @@ public class VolPlayer : MonoBehaviour
     }
 
     /// <summary>
-    /// Read the next geometry and texture frame
+    /// Read a desired geometry and texture frame
     /// </summary>
     /// <param name="currentFrameIndex">The frame we last played.</param>
     /// <param name="desiredFrameIndex">The frame we want to retrieve and upload to the current texture.</param>
@@ -551,9 +559,12 @@ public class VolPlayer : MonoBehaviour
         if (desiredFrameIndex >= _numFrames || currentFrameIndex >= desiredFrameIndex ) { return; }
 
         // Always skip ahead to desired frame. (This is a workaround until we get better video decoder seek behaviour).
-        for (int videoFrameIndex = _currentFrameIndex; videoFrameIndex < desiredFrameIndex - 1; videoFrameIndex++ ) { _colorPtr = VolPluginInterface.VolReadNextFrame(false); }
+        for (int videoFrameIndex = _currentFrameIndex; videoFrameIndex < desiredFrameIndex - 1; videoFrameIndex++ )
+        {
+            _colorPtr = VolPluginInterface.VolReadNextVideoFrame(false);
+        }
         // This is the frame we want, and we vertically flip this too.
-        _colorPtr = VolPluginInterface.VolReadNextFrame(true);
+        _colorPtr = VolPluginInterface.VolReadNextVideoFrame(true);
         { // Upload only the texture from the desired frame to the GPU via Unity.
             _voloTexture.LoadRawTextureData(_colorPtr, (int) VolPluginInterface.VolGetFrameSize());
             _voloTexture.Apply();
@@ -576,10 +587,7 @@ public class VolPlayer : MonoBehaviour
 
 
         string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-        bool success = frame == -1 
-            ? VolPluginInterface.VolGeomReadNextFrame(sequenceFile) 
-            : VolPluginInterface.VolGeomReadFrame(sequenceFile, frame);
-        if (!success)
+        if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
         {
             Debug.LogError("Error loading geometry frame");
             return;
