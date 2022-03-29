@@ -126,7 +126,23 @@ public class VolPlayer : MonoBehaviour
         }
         // Always skip video frames to desired frame.
         ReadVideoFrame(_currentFrameIndex, desiredFrameIndex);
-        ReadGeomFrame(_currentFrameIndex, desiredFrameIndex);
+        {
+            int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
+            bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
+            // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
+            // unless it is a keyframe itself.
+            bool needToLoadKeyframe = (currentFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
+
+            string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+            if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
+            {
+                Debug.LogError("Error loading geometry frame");
+                return;
+            }
+            if ( needToLoadKeyframe ) { ReadGeomFrame( previousKeyframeIndex); }
+            ReadGeomFrame( desiredFrameIndex);
+        }
+        _currentFrameIndex = desiredFrameIndex;
     }
 
     /// <summary>
@@ -330,37 +346,6 @@ public class VolPlayer : MonoBehaviour
         if (audioOn && _audioPlayer != null)
         {
             _audioPlayer.Pause();
-        }
-    }
-
-    private bool _isSkipping = false;
-    /// <summary>
-    /// (EXPERIMENTAL) Skip to a given frame number
-    /// </summary>
-    /// <param name="frame">Frame to skip to</param>
-    public void SkipTo(int frame)
-    {
-        if (!IsOpen) 
-            return;
-        
-        if (_isSkipping || frame <= _currentFrameIndex)
-            return;
-
-        _isSkipping = true;
-        Pause();
-
-        while (_currentFrameIndex < frame)
-        {
-            ReadNextFrame(true);
-        }
-        
-        ReadNextFrame();
-        ReadNextGeom(frame);
-        _isSkipping = false;
-        
-        if (audioOn && _audioPlayer != null)
-        {
-            _audioPlayer.time = 1.0 / frame * 30.0;
         }
     }
 
@@ -579,12 +564,10 @@ public class VolPlayer : MonoBehaviour
     /// <summary>
     /// Read and process a frame's geometry data
     /// </summary>
-    /// <param name="currentFrameIndex">The frame we last played. This helps us check for keyframe skip-over.</param>
     /// <param name="desiredFrameIndex">The frame we want. Loads directly, except if we need to load a prior keyframe.</param>
-    private void ReadGeomFrame(int currentFrameIndex, int desiredFrameIndex)
+    private void ReadGeomFrame(int desiredFrameIndex)
     {
-        int previousKeyframeIndex = TODO ANTON UP TO HERE -> add this function to the interface.
-
+        bool isKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
 
         string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
         if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
@@ -598,6 +581,7 @@ public class VolPlayer : MonoBehaviour
         if (_geometryData.blockDataSize == 0)
             return;
 
+        // TODO(Anton) maybe can remove a memcopy here with a cast/pointer? 
         _meshData = new byte[_geometryData.blockDataSize];
         Marshal.Copy(_geometryData.blockDataPtr, _meshData, 0, (int)_geometryData.blockDataSize);
         NativeArray<byte> nativeMeshData = new NativeArray<byte>(_meshData, Allocator.Temp);
@@ -628,20 +612,22 @@ public class VolPlayer : MonoBehaviour
 #endif
         }
 
-        if (_geometryData.indicesSize > 0)
+        if ( isKeyframe && _geometryData.indicesSize > 0)
         {
             NativeSlice<ushort> indicesSlice =
                 nativeMeshData.Slice((int) _geometryData.indicesOffset, _geometryData.indicesSize).SliceConvert<ushort>();
             _keyShortIndices = indicesSlice.ToArray();
         }
 
+        if ( isKeyframe ) {
 #if UNITY_EDITOR
-        _meshFilter.sharedMesh.SetIndices(_keyShortIndices, MeshTopology.Triangles, 0);
+            _meshFilter.sharedMesh.SetIndices(_keyShortIndices, MeshTopology.Triangles, 0);
 #else
-        _meshFilter.mesh.SetIndices(_keyShortIndices, MeshTopology.Triangles, 0);
+            _meshFilter.mesh.SetIndices(_keyShortIndices, MeshTopology.Triangles, 0);
 #endif
+        }
 
-        if (_geometryData.uvSize > 0)
+        if ( isKeyframe && _geometryData.uvSize > 0)
         {
             NativeSlice<Vector2> uvSlice = nativeMeshData.Slice((int) _geometryData.uvOffset, _geometryData.uvSize)
                 .SliceConvert<Vector2>();
@@ -649,11 +635,11 @@ public class VolPlayer : MonoBehaviour
         }
         
 #if UNITY_EDITOR
-        _meshFilter.sharedMesh.SetUVs(0, _keyUvs);
+        if ( isKeyframe ) { _meshFilter.sharedMesh.SetUVs(0, _keyUvs); } // TODO(Anton) check this if statement makes sense.
         _meshFilter.sharedMesh.RecalculateBounds();
         _meshFilter.sharedMesh.MarkModified();
 #else 
-        _meshFilter.mesh.SetUVs(0, _keyUvs);
+        if ( isKeyframe ) { _meshFilter.mesh.SetUVs(0, _keyUvs); } // TODO(Anton) check this if statement makes sense.
         _meshFilter.mesh.RecalculateBounds();
         _meshFilter.mesh.MarkModified();
 #endif
@@ -693,9 +679,6 @@ public class VolPlayer : MonoBehaviour
 
     private void AudioVideoPlayerOnFrameReady(VideoPlayer source, long frameidx)
     {
-        if (frameidx - Frame > 15)
-        {
-            SkipTo((int)frameidx);
-        }
+
     }
 }
