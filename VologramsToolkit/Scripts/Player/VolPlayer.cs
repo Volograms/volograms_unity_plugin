@@ -124,24 +124,21 @@ public class VolPlayer : MonoBehaviour
             }
             return;
         }
+        // --VIDEO TEXTURE--
         // Always skip video frames to desired frame.
         ReadVideoFrame(_currentFrameIndex, desiredFrameIndex);
-        {
+
+        { // --GEOMETRY--
             int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
             bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
             // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
             // unless it is a keyframe itself.
-            bool needToLoadKeyframe = (currentFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
-
-            string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-            if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
-            {
-                Debug.LogError("Error loading geometry frame");
-                return;
-            }
+            bool needToLoadKeyframe = (_currentFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
             if ( needToLoadKeyframe ) { ReadGeomFrame( previousKeyframeIndex); }
             ReadGeomFrame( desiredFrameIndex);
         }
+        
+        // Advance frame
         _currentFrameIndex = desiredFrameIndex;
     }
 
