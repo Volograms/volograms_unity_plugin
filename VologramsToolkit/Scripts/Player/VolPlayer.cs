@@ -40,7 +40,7 @@ public class VolPlayer : MonoBehaviour
     
     private string _fullGeomPath;
     private string _fullVideoPath;
-    private int _currentFrameIndex;
+    private int _currentlyLoadedFrameIndex; // Start at -1 so after loading first frame it gets set to 0.
     private int _numFrames;
     private bool _hasVideoTexture;
     // When an animation starts this value is 0. When the last frame is played it is == video duration. On loop it resets to zero.
@@ -59,7 +59,7 @@ public class VolPlayer : MonoBehaviour
 
     public bool IsOpen { get; private set; }
     public bool IsPlaying { get; private set; }
-    public int Frame => _currentFrameIndex;
+    //public int Frame => _currentFrameIndex; // TODO(Anton) have i broken something here?
     public bool IsMuted => audioOn && _audioPlayer != null && _audioPlayer.GetDirectAudioMute(0);
     
     /// <summary>
@@ -111,7 +111,7 @@ public class VolPlayer : MonoBehaviour
         _animationAccumulatedSeconds += Time.deltaTime;
         int desiredFrameIndex = (int)(_animationAccumulatedSeconds / _secondsPerFrame);
         // Not enough time has passed to advance to the next frame yet.
-        if ( desiredFrameIndex == _currentFrameIndex ) { return; }
+        if ( desiredFrameIndex == _currentlyLoadedFrameIndex ) { return; }
 
         if (desiredFrameIndex >= _numFrames )
         {
@@ -126,20 +126,20 @@ public class VolPlayer : MonoBehaviour
         }
         // --VIDEO TEXTURE--
         // Always skip video frames to desired frame.
-        ReadVideoFrame(_currentFrameIndex, desiredFrameIndex);
+        ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
 
         { // --GEOMETRY--
             int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
             bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
             // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
             // unless it is a keyframe itself.
-            bool needToLoadKeyframe = (_currentFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
+            bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
             if ( needToLoadKeyframe ) { ReadGeomFrame( previousKeyframeIndex); }
             ReadGeomFrame( desiredFrameIndex);
         }
-        
+
         // Advance frame
-        _currentFrameIndex = desiredFrameIndex;
+        _currentlyLoadedFrameIndex = desiredFrameIndex;
     }
 
     /// <summary>
@@ -231,7 +231,7 @@ public class VolPlayer : MonoBehaviour
             return false;
         }
 
-        _currentFrameIndex = 0;
+        _currentlyLoadedFrameIndex = -1;
         _animationAccumulatedSeconds = 0f;
         _numFrames = VolPluginInterface.VolGeomGetFrameCount();
         double fps = VolPluginInterface.VolGetFrameRate();
@@ -381,7 +381,7 @@ public class VolPlayer : MonoBehaviour
             return false;
         }
 
-        _currentFrameIndex = 0;
+        _currentlyLoadedFrameIndex = -1;
         _animationAccumulatedSeconds = 0f;
 
         IsOpen = true;
@@ -400,7 +400,7 @@ public class VolPlayer : MonoBehaviour
         
         playOnStart = false;
 
-        int desiredFrameIndex = _currentFrameIndex + 1;
+        int desiredFrameIndex = _currentlyLoadedFrameIndex + 1;
         if (desiredFrameIndex >= _numFrames )
         {
             if (isLooping)
@@ -410,8 +410,8 @@ public class VolPlayer : MonoBehaviour
             return;
         }
         // Always skip video frames to desired frame.
-        ReadVideoFrame(_currentFrameIndex, desiredFrameIndex);
-        ReadGeomFrame(_currentFrameIndex, desiredFrameIndex);
+        ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
+        ReadGeomFrame(desiredFrameIndex);
     }
 
     /// <summary>
@@ -541,7 +541,7 @@ public class VolPlayer : MonoBehaviour
         if (desiredFrameIndex >= _numFrames || currentFrameIndex >= desiredFrameIndex ) { return; }
 
         // Always skip ahead to desired frame. (This is a workaround until we get better video decoder seek behaviour).
-        for (int videoFrameIndex = _currentFrameIndex; videoFrameIndex < desiredFrameIndex - 1; videoFrameIndex++ )
+        for (int videoFrameIndex = _currentlyLoadedFrameIndex; videoFrameIndex < desiredFrameIndex - 1; videoFrameIndex++ )
         {
             _colorPtr = VolPluginInterface.VolReadNextVideoFrame(false);
         }
@@ -561,10 +561,11 @@ public class VolPlayer : MonoBehaviour
     /// <summary>
     /// Read and process a frame's geometry data
     /// </summary>
-    /// <param name="desiredFrameIndex">The frame we want. Loads directly, except if we need to load a prior keyframe.</param>
-    private void ReadGeomFrame(int desiredFrameIndex)
+    private void ReadGeomFrame(int frame)
     {
-        bool isKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
+        if ( frame >= _numFrames ) { return; }
+
+        bool isKeyframe = VolPluginInterface.VolGeomIsKeyframe(frame);
 
         string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
         if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
@@ -608,7 +609,9 @@ public class VolPlayer : MonoBehaviour
             _meshFilter.mesh.SetNormals(normalsSlice.ToArray());
 #endif
         }
-
+        // TODO(Anton) - Patrick please check this, I was hoping to skip some updates here
+        isKeyframe = true; // HACK(Anton) ... but it didn't work.
+ 
         if ( isKeyframe && _geometryData.indicesSize > 0)
         {
             NativeSlice<ushort> indicesSlice =
