@@ -235,6 +235,7 @@ public class VolPlayer : MonoBehaviour
         _animationAccumulatedSeconds = 0f;
         _numFrames = VolPluginInterface.VolGeomGetFrameCount();
         double fps = VolPluginInterface.VolGetFrameRate();
+        if ( 0.0 == fps ) { fps = 30.0; }
         _secondsPerFrame = 1f / fps; // TODO(Anton) -- we should fetch this from vol_av rather than rely on 30fps.
 
         _voloTexture = new Texture2D(
