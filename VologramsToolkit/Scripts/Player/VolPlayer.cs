@@ -532,7 +532,7 @@ public class VolPlayer : MonoBehaviour
     }
 
     /// <summary>
-    /// Read a desired geometry and texture frame
+    /// Read a desired texture frame
     /// </summary>
     /// <param name="currentFrameIndex">The frame we last played.</param>
     /// <param name="desiredFrameIndex">The frame we want to retrieve and upload to the current texture.</param>
