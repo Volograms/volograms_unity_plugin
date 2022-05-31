@@ -3,8 +3,9 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.9
- * Authors   | Anton Gerdelan <anton@volograms.com>
+ * Version   | 0.10
+ * Authors   | Anton Gerdelan     <anton@volograms.com>
+ *           | Patrick Geoghegan  <patrick@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
  * Files     | 2
@@ -12,7 +13,6 @@
  *
  * Core library code that reads geometry data for a VOL sequence.
  * These functions are to be built into an application/engine and called from engine code.
- * File format spec: https://volograms.atlassian.net/wiki/spaces/PL/pages/105676833/VOLS+File+Format
  *
  * Eventually
  * ----------
@@ -21,17 +21,18 @@
  *
  * History
  * -------
- * - 0.9.0 (2022/03/22) - Version bump for parity with vol_av.
- * - 0.7.1 (2021/01/24) - New option streaming_mode paramter to vol_geom_create_file_info().
+ * - 0.10.0 (2022/03/22) - Support added for reading >2GB volograms.
+ * - 0.9.0  (2022/03/22) - Version bump for parity with vol_av.
+ * - 0.7.1  (2021/01/24) - New option streaming_mode paramter to vol_geom_create_file_info().
  *                        Set to false for typical phone captures to pre-load the sequence file to reduce disk I/O at run-time.
- * - 0.7.0 (2021/01/20) - Added customisable debug callback.
- * - 0.6.1 (2021/11/25) - Patched 0.6 to add file memory size validation vulnerabilities reported by fuzzer.
- * - 0.6   (2021/11/24) - Better memory allocation and management - improved performance & simpler API should reduce risk of accidental memory leaks.
- * - 0.5   (2021/11/15) - Better platform consistency with specified byte-size type.
- * - 0.4   (2021/10/15) - Updated licence and copyright information.
- * - 0.3   (2021/08/25) - Moved some assertions out and into test program.
- * - 0.2   (2021/08/23) - Added declspec API exports, prefixed types and function names properly with vol_geom_
- * - 0.1.1              - Renamed from vol_read to vol_geom.
+ * - 0.7.0  (2021/01/20) - Added customisable debug callback.
+ * - 0.6.1  (2021/11/25) - Patched 0.6 to add file memory size validation vulnerabilities reported by fuzzer.
+ * - 0.6    (2021/11/24) - Better memory allocation and management - improved performance & simpler API should reduce risk of accidental memory leaks.
+ * - 0.5    (2021/11/15) - Better platform consistency with specified byte-size type.
+ * - 0.4    (2021/10/15) - Updated licence and copyright information.
+ * - 0.3    (2021/08/25) - Moved some assertions out and into test program.
+ * - 0.2    (2021/08/23) - Added declspec API exports, prefixed types and function names properly with vol_geom_
+ * - 0.1.1               - Renamed from vol_read to vol_geom.
  */
 
 #pragma once
@@ -52,7 +53,7 @@ extern "C" {
 #include <stdint.h>
 
 /** Using a specified-size type instead of size_t for better platform consistency. */
-typedef uint64_t vol_geom_size_t;
+typedef int64_t vol_geom_size_t; // Note that signed int64 should be compatible with off_t.
 
 /** Helper struct to store Unity-style strings from VOL file. */
 VOL_GEOM_EXPORT typedef struct vol_geom_short_str_t {
