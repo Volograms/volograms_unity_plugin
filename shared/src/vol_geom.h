@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.10
+ * Version   | 0.10.1
  * Authors   | Anton Gerdelan     <anton@volograms.com>
  *           | Patrick Geoghegan  <patrick@volograms.com>
  * Copyright | 2021, Volograms (http://volograms.com/)
@@ -21,6 +21,7 @@
  *
  * History
  * -------
+ * - 0.10.1 (2022/03/31) - More verbose file reading error logs.
  * - 0.10.0 (2022/03/22) - Support added for reading >2GB volograms.
  * - 0.9.0  (2022/03/22) - Version bump for parity with vol_av.
  * - 0.7.1  (2021/01/24) - New option streaming_mode paramter to vol_geom_create_file_info().

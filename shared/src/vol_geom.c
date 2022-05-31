@@ -3,7 +3,7 @@
  *
  * vol_geom  | .vol Geometry Decoding API
  * --------- | ---------------------
- * Version   | 0.10
+ * Version   | 0.10.1
  * Authors   | See matching header file.
  * Copyright | 2021, Volograms (http://volograms.com/)
  * Language  | C99
@@ -93,16 +93,28 @@ static bool _read_entire_file( const char* filename, vol_geom_file_record_t* fr_
 
   if ( !filename || !fr_ptr ) { goto vol_geom_read_entire_file_failed; }
 
-  if ( !_get_file_sz( filename, &fr_ptr->sz ) ) { goto vol_geom_read_entire_file_failed; }
+  if ( !_get_file_sz( filename, &fr_ptr->sz ) ) {
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: failed to get file size.\n" );
+    goto vol_geom_read_entire_file_failed;
+  }
 
   _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Allocating %" PRId64 " bytes for reading file\n", fr_ptr->sz );
   fr_ptr->byte_ptr = malloc( (size_t)fr_ptr->sz );
-  if ( !fr_ptr->byte_ptr ) { goto vol_geom_read_entire_file_failed; }
+  if ( !fr_ptr->byte_ptr ) { 
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: failed to allocate memory for file.\n" );
+    goto vol_geom_read_entire_file_failed;
+  }
 
   f_ptr = fopen( filename, "rb" );
-  if ( !f_ptr ) { goto vol_geom_read_entire_file_failed; }
+  if ( !f_ptr ) { 
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: failed to open file (permissions or missing).\n" );
+    goto vol_geom_read_entire_file_failed;
+  }
   vol_geom_size_t nr = fread( fr_ptr->byte_ptr, fr_ptr->sz, 1, f_ptr );
-  if ( 1 != nr ) { goto vol_geom_read_entire_file_failed; }
+  if ( 1 != nr ) {
+    _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: failed to read file to memory.\n" );
+    goto vol_geom_read_entire_file_failed;
+  }
 
   fclose( f_ptr );
   return true;
@@ -350,8 +362,14 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
   vol_geom_size_t hdr_sz        = 0;
   *info_ptr                     = ( vol_geom_info_t ){ .biggest_frame_blob_sz = 0 }; // zero in case of struct re-use.
   {
-    if ( !_read_entire_file( hdr_filename, &record ) ) { goto failed_to_read_info; }
-    if ( !_read_vol_file_hdr( &record, &info_ptr->hdr, &hdr_sz ) ) { goto failed_to_read_info; }
+    if ( !_read_entire_file( hdr_filename, &record ) ) {
+        _vol_loggerf(VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Failed to read entire file header.\n");
+        goto failed_to_read_info;
+    }
+    if ( !_read_vol_file_hdr( &record, &info_ptr->hdr, &hdr_sz ) ) {
+        _vol_loggerf(VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Failed to read vol file header.\n");
+        goto failed_to_read_info;
+    }
 
     // done with file record so tidy-up memory
     if ( record.byte_ptr != NULL ) {
@@ -386,7 +404,10 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
   // find out the size and offset of every frame
   { // fetch frame from sequence file
     vol_geom_size_t sequence_file_sz = 0;
-    if ( !_get_file_sz( seq_filename, &sequence_file_sz ) ) { goto failed_to_read_info; }
+    if ( !_get_file_sz( seq_filename, &sequence_file_sz ) ) {
+        _vol_loggerf(VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Failed to get sequence file %s size.\n", seq_filename);
+        goto failed_to_read_info;
+    }
     _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Sequence file is %" PRId64 " bytes\n", sequence_file_sz );
 
     f_ptr = fopen( seq_filename, "rb" );
@@ -425,7 +446,11 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
       }
 
       vol_geom_size_t frame_current_offset = vol_geom_ftello( f_ptr );
-      if ( -1LL == frame_current_offset ) { goto failed_to_read_info; }
+      if ( -1LL == frame_current_offset ) {
+          _vol_loggerf(VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Failed to retrieve correct file offset (1).\n");
+          goto failed_to_read_info;
+      }
+    
       info_ptr->frames_directory_ptr[i].hdr_sz = (vol_geom_size_t)frame_current_offset - (vol_geom_size_t)frame_start_offset;
 
       // in version 12 mesh_data_sz includes array sizes, but earlier versions need to add that to payload size
@@ -455,7 +480,10 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
         goto failed_to_read_info;
       }
       frame_current_offset = vol_geom_ftello( f_ptr );
-      if ( -1LL == frame_current_offset ) { goto failed_to_read_info; }
+      if ( -1LL == frame_current_offset ) {
+          _vol_loggerf(VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Failed to retrieve correct file offset (2).\n");
+          goto failed_to_read_info;
+      }
 
       // update frame directory and store frame header
       info_ptr->frames_directory_ptr[i].offset_sz = (vol_geom_size_t)frame_start_offset;
@@ -491,7 +519,10 @@ bool vol_geom_create_file_info( const char* hdr_filename, const char* seq_filena
   if ( !streaming_mode ) {
     _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Reading entire sequence file to blob memory\n" );
     vol_geom_file_record_t seq_blob = ( vol_geom_file_record_t ){ .sz = 0 };
-    if ( !_read_entire_file( seq_filename, &seq_blob ) ) { goto failed_to_read_info; }
+    if ( !_read_entire_file( seq_filename, &seq_blob ) ) {
+        _vol_loggerf(VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Failed to read entire file.\n");
+        goto failed_to_read_info;
+    }
     info_ptr->sequence_blob_byte_ptr = (uint8_t*)seq_blob.byte_ptr;
   }
 
