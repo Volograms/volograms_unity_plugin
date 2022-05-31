@@ -136,19 +136,19 @@ public class VolPluginInterface
         {
             case 0: 
                 if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Info))
-                    Debug.Log($"VOL_LIB {debugString}");
+                    Debug.Log($"VOL_LIB [info] {debugString}");
                 break;
             case 1:
                 if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Debug))
-                    Debug.Log($"VOL_LIB {debugString}");
+                    Debug.Log($"VOL_LIB [debug] {debugString}");
                 break;
             case 2:
                 if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Warning))
-                    Debug.LogWarning($"VOL_LIB {debugString}");
+                    Debug.LogWarning($"VOL_LIB [warning] {debugString}");
                 break;
             case 3:
                 if (interfaceLoggingLevel.HasFlag(VolEnums.LoggingLevel.Error))
-                    Debug.LogError($"VOL_LIB {debugString}");
+                    Debug.LogError($"VOL_LIB [error] {debugString}");
                 break;
             default:
                 Debug.Log(debugString);
@@ -163,19 +163,19 @@ public class VolPluginInterface
         {
             case 0: 
                 if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Info))
-                    Debug.Log($"VOL_GEOM {debugString}");
+                    Debug.Log($"VOL_GEOM [info] {debugString}");
                 break;
             case 1:
                 if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Debug))
-                    Debug.Log($"VOL_GEOM {debugString}");
+                    Debug.Log($"VOL_GEOM [debug] {debugString}");
                 break;
             case 2:
                 if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Warning))
-                    Debug.LogWarning($"VOL_GEOM {debugString}");
+                    Debug.LogWarning($"VOL_GEOM [warning] {debugString}");
                 break;
             case 3:
                 if (geomLoggingLevel.HasFlag(VolEnums.LoggingLevel.Error))
-                    Debug.LogError($"VOL_GEOM {debugString}");
+                    Debug.LogError($"VOL_GEOM [error] {debugString}");
                 break;
             default:
                 Debug.Log(debugString);
@@ -190,19 +190,19 @@ public class VolPluginInterface
         {
             case 0:
                 if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Info))
-                    Debug.Log($"VOL_AV {debugString}");
+                    Debug.Log($"VOL_AV [info] {debugString}");
                 break;
             case 1:
                 if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Debug))
-                    Debug.Log($"VOL_AV {debugString}");
+                    Debug.Log($"VOL_AV [debug] {debugString}");
                 break;
             case 2:
                 if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Warning))
-                    Debug.LogWarning($"VOL_AV {debugString}");
+                    Debug.LogWarning($"VOL_AV [warning] {debugString}");
                 break;
             case 3:
                 if (avLoggingLevel.HasFlag(VolEnums.LoggingLevel.Error))
-                    Debug.LogError($"VOL_AV {debugString}");
+                    Debug.LogError($"VOL_AV [error] {debugString}");
                 break;
             default:
                 Debug.Log(debugString);
