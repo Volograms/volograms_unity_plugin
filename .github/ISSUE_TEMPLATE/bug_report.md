@@ -20,6 +20,11 @@ Steps to reproduce the behavior:
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
+**Attach Debug Logs**
+
+* See https://github.com/Volograms/volograms_unity_plugin/wiki/Activating-Debug-Logging
+* Please attach the output of any volograms logs to the ticket.
+
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
