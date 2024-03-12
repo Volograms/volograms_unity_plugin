@@ -4,7 +4,7 @@ Work in progress
 
 ## Setting Up
 * Download [`ffmpeg`](https://ffmpeg.org/) from this [repo](https://github.com/BtbN/FFmpeg-Builds/releases)
-      * Download the build labelled like `ffmpeg-N-xxxxxx-xxxxxxxxxxx-win64-gpl-shared.zip`
+      * Download the build labelled like `ffmpeg-N-xxxxxx-xxxxxxxxxxx-win64-gpl-shared.zip` (Tested with a version Auto-Build 2023-10-31 13:06)
       * Unzip the file and note where you place the extracted folder
       * In this document `ffmpeg_win` refers to the location of ffmpeg on your machine  
 
