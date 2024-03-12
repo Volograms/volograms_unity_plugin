@@ -132,10 +132,9 @@ public class VolPlayer : MonoBehaviour
         }
         // --VIDEO TEXTURE--
         // Always skip video frames to desired frame.
-        if(_hasVideoTexture)
+        if(volFormat == VolEnums.VolFormat.Video) {
             ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
-
-        { // --GEOMETRY--
+            { // --GEOMETRY--
             int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
             bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
             // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
@@ -143,6 +142,20 @@ public class VolPlayer : MonoBehaviour
             bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
             if ( needToLoadKeyframe ) { ReadGeomFrame( previousKeyframeIndex); }
             ReadGeomFrame( desiredFrameIndex);
+        }
+        }
+        else 
+        {
+            // --GEOMETRY--
+            int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
+            bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
+            // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
+            // unless it is a keyframe itself.
+            bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
+            if ( needToLoadKeyframe ) { ReadGeomFrame( previousKeyframeIndex); }
+            ReadGeomFrame( desiredFrameIndex);
+            // Swap the order - mesh first, texture next
+            ReadTextureFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
         }
 
         // Advance frame
@@ -185,51 +198,62 @@ public class VolPlayer : MonoBehaviour
         VolPluginInterface.EnableAvLogging();
         VolPluginInterface.EnableGeomLogging();
 
-        _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
-        _fullVideoPath = volVideoTexturePathType.ResolvePath(volVideoTexture);
-
-        if (_hasVideoTexture)
+        if(VolEnums.VolFormat.Video == volFormat) 
         {
-            bool openedVideo = VolPluginInterface.VolOpenFile(_fullVideoPath);
-            if (!openedVideo)
+            _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
+            _fullVideoPath = volVideoTexturePathType.ResolvePath(volVideoTexture);
+
+            if (_hasVideoTexture)
             {
-                IsOpen = false;
-                Close();
-                return false;
+                bool openedVideo = VolPluginInterface.VolOpenFile(_fullVideoPath);
+                if (!openedVideo)
+                {
+                    IsOpen = false;
+                    Close();
+                    return false;
+                }
             }
-        }
 
-        if (audioOn)
+            if (audioOn)
+            {
+                _audioPlayer.Stop();
+                _audioPlayer.sendFrameReadyEvents = true;
+                _audioPlayer.source = VideoSource.Url;
+                _audioPlayer.url = _fullVideoPath;
+                
+                _audioPlayer.frameReady -= AudioVideoPlayerOnFrameReady;
+                _audioPlayer.frameReady += AudioVideoPlayerOnFrameReady;
+                _audioPlayer.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
+                _audioPlayer.loopPointReached += AudioVideoPlayerOnLoopPointReached;
+                _audioPlayer.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
+                _audioPlayer.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
+                _audioPlayer.errorReceived -= AudioVideoPlayerOnErrorReceived;
+                _audioPlayer.errorReceived += AudioVideoPlayerOnErrorReceived;
+                
+                _audioPlayer.renderMode = VideoRenderMode.APIOnly;
+                _audioPlayer.audioOutputMode = VideoAudioOutputMode.Direct;
+                _audioPlayer.EnableAudioTrack(0, true);
+                _audioPlayer.SetDirectAudioVolume(0, 1f);
+                _audioPlayer.SetDirectAudioMute(0, false);
+                _audioPlayer.controlledAudioTrackCount = 1;
+                _audioPlayer.Prepare();
+            }
+        } 
+        else
         {
-            _audioPlayer.Stop();
-            _audioPlayer.sendFrameReadyEvents = true;
-            _audioPlayer.source = VideoSource.Url;
-            _audioPlayer.url = _fullVideoPath;
-            
-            _audioPlayer.frameReady -= AudioVideoPlayerOnFrameReady;
-            _audioPlayer.frameReady += AudioVideoPlayerOnFrameReady;
-            _audioPlayer.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
-            _audioPlayer.loopPointReached += AudioVideoPlayerOnLoopPointReached;
-            _audioPlayer.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
-            _audioPlayer.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
-            _audioPlayer.errorReceived -= AudioVideoPlayerOnErrorReceived;
-            _audioPlayer.errorReceived += AudioVideoPlayerOnErrorReceived;
-            
-            _audioPlayer.renderMode = VideoRenderMode.APIOnly;
-            _audioPlayer.audioOutputMode = VideoAudioOutputMode.Direct;
-            _audioPlayer.EnableAudioTrack(0, true);
-            _audioPlayer.SetDirectAudioVolume(0, 1f);
-            _audioPlayer.SetDirectAudioMute(0, false);
-            _audioPlayer.controlledAudioTrackCount = 1;
-            _audioPlayer.Prepare();
-        }
+
+        } 
+
         bool geomOpened;
-        if(volFormat == VolEnums.VolFormat.Video) {
+        if(volFormat == VolEnums.VolFormat.Video) 
+        {
             _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
             string headerFile = Path.Combine(_fullGeomPath, "header.vols");
             string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
             geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
-        } else {
+        } 
+        else 
+        {
             string headerFile = "";
             _fullGeomPath = volFilePathType.ResolvePath(volFile);
             geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, true);
@@ -428,7 +452,10 @@ public class VolPlayer : MonoBehaviour
             return;
         }
         // Always skip video frames to desired frame.
-        ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
+        if(volFormat == VolEnums.VolFormat.Video)
+            ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
+        else
+            ReadTextureFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
         ReadGeomFrame(desiredFrameIndex);
     }
 
@@ -550,7 +577,7 @@ public class VolPlayer : MonoBehaviour
     }
 
     /// <summary>
-    /// Read a desired texture frame
+    /// Read a desired video texture frame
     /// </summary>
     /// <param name="currentFrameIndex">The frame we last played.</param>
     /// <param name="desiredFrameIndex">The frame we want to retrieve and upload to the current texture.</param>
@@ -567,6 +594,34 @@ public class VolPlayer : MonoBehaviour
         _colorPtr = VolPluginInterface.VolReadNextVideoFrame(true);
         { // Upload only the texture from the desired frame to the GPU via Unity.
             _voloTexture.LoadRawTextureData(_colorPtr, (int) VolPluginInterface.VolGetFrameSize());
+            _voloTexture.Apply();
+#if UNITY_EDITOR
+            _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);
+#else
+            _meshRenderer.material.SetTexture(_textureId, _voloTexture);
+#endif
+        }
+    }
+
+    /// <summary>
+    /// Read a desired Basis texture frame
+    /// </summary>
+    /// <param name="currentFrameIndex">The frame we last played.</param>
+    /// <param name="desiredFrameIndex">The frame we want to retrieve and upload to the current texture.</param>
+    private void ReadTextureFrame(int currentFrameIndex, int desiredFrameIndex)
+    {
+        // if (desiredFrameIndex >= _numFrames || currentFrameIndex >= desiredFrameIndex ) { return; }
+
+        // // Always skip ahead to desired frame. (This is a workaround until we get better video decoder seek behaviour).
+        // for (int videoFrameIndex = _currentlyLoadedFrameIndex; videoFrameIndex < desiredFrameIndex - 1; videoFrameIndex++ )
+        // {
+        // _colorPtr = VolPluginInterface.VolReadNextTextureFrame(false);
+        // }
+        // This is the frame we want, and we vertically flip this too.
+        _colorPtr = VolPluginInterface.VolReadNextTextureFrame(false);
+        { // Upload only the texture from the desired frame to the GPU via Unity.
+            // Debug.Log(_colorPtr);
+            _voloTexture.LoadRawTextureData(_colorPtr, (int) VolPluginInterface.VolGetTextureSize());
             _voloTexture.Apply();
 #if UNITY_EDITOR
             _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);

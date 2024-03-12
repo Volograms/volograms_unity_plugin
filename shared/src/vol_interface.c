@@ -30,6 +30,7 @@
 
 #include "vol_av.h"
 #include "vol_geom.h"
+#include "vol_basis.h"
 
 #ifdef _WIN32
 #define DllExport __declspec (dllexport)
@@ -158,7 +159,7 @@ DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* s
 {
     memset(&geom_file_ptr, 0, sizeof(vol_geom_info_t));
     bool opened = false;
-    
+
     if(hdr_filename[0] != '\0')
         opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr, streaming_mode);
     else 
@@ -232,6 +233,47 @@ DllExport vol_geom_info_t native_vol_get_geom_info(void)
 {
     return geom_file_ptr;
 }
+
+/**
+ * Basis Texture from Vols File
+ */
+static uint8_t* output_blocks_ptr = 0;
+
+/** Read the next frame of the video
+ @returns   Pointer to the video frame pixel data
+ */
+DllExport uint8_t * native_vol_read_next_texture_frame( bool flip_vertical )
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    if(vol_info.hdr.textured) {
+        
+        size_t texture_size = vol_info.hdr.texture_width * vol_info.hdr.texture_height;
+
+        if(output_blocks_ptr == 0)
+            output_blocks_ptr = (uint8_t*)malloc( texture_size );
+
+        vol_geom_frame_data_t vols_frame_data = native_vol_get_geom_ptr_data();
+        uint8_t* vols_texture_ptr = (uint8_t*)&vols_frame_data.block_data_ptr[vols_frame_data.texture_offset];
+        size_t vols_texture_sz   = vols_frame_data.texture_sz; 
+        // TODO: replace 3 with texture format
+        if ( !vol_basis_transcode( 3, vols_texture_ptr, vols_texture_sz, output_blocks_ptr, texture_size, &(vol_info.hdr.texture_width), &(vol_info.hdr.texture_height)))
+            return 0;
+        
+        return output_blocks_ptr;
+    } else {
+        return 0;
+    }
+}
+
+/** Get the size of a video frame in bytes
+ @returns   The number of bytes in a video frame
+ */
+DllExport int64_t native_vol_get_texture_frame_size(void)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_info.hdr.texture_width * vol_info.hdr.texture_height;
+}
+
 
 /**
  * Video File

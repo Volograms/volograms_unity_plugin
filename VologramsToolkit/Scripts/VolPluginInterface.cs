@@ -96,6 +96,15 @@ public class VolPluginInterface
     [DllImport(DLL, EntryPoint = "native_vol_get_geom_ptr_data")]
     public static extern VolGeometryData VolGeomGetPtrData();
 
+
+    //Basis Texture from Vols File
+    [DllImport(DLL, EntryPoint = "native_vol_read_next_texture_frame")]
+    public static extern IntPtr VolReadNextTextureFrame(bool flipVertical);
+
+    [DllImport(DLL, EntryPoint = "native_vol_get_texture_frame_size")]
+    public static extern long VolGetTextureSize();
+
+
     // Video file functions
     [DllImport(DLL, EntryPoint = "native_vol_open_video_file")]
     public static extern bool VolOpenFile(string filename);
