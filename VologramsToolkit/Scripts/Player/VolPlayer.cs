@@ -13,6 +13,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Video;
 
+[Serializable]
 [RequireComponent(typeof(MeshFilter))]
 [RequireComponent(typeof(MeshRenderer))]
 public class VolPlayer : MonoBehaviour
@@ -21,8 +22,13 @@ public class VolPlayer : MonoBehaviour
     public VolEnums.PathType volFolderPathType;
     public string volFolder;
 
+    public VolEnums.PathType volFilePathType;
+    public string volFile;
+
     public VolEnums.PathType volVideoTexturePathType;
     public string volVideoTexture;
+
+    public VolEnums.VolFormat volFormat;
 
     [Header("Playback Settings")]
     public bool playOnStart = true;
@@ -126,7 +132,8 @@ public class VolPlayer : MonoBehaviour
         }
         // --VIDEO TEXTURE--
         // Always skip video frames to desired frame.
-        ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
+        if(_hasVideoTexture)
+            ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
 
         { // --GEOMETRY--
             int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
@@ -216,12 +223,17 @@ public class VolPlayer : MonoBehaviour
             _audioPlayer.controlledAudioTrackCount = 1;
             _audioPlayer.Prepare();
         }
-
-        _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
-        string headerFile = Path.Combine(_fullGeomPath, "header.vols");
-        string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-        bool geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
-        
+        bool geomOpened;
+        if(volFormat == VolEnums.VolFormat.Video) {
+            _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
+            string headerFile = Path.Combine(_fullGeomPath, "header.vols");
+            string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+            geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
+        } else {
+            string headerFile = "";
+            _fullGeomPath = volFilePathType.ResolvePath(volFile);
+            geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, true);
+        }
         if (!geomOpened)
         {
             if (_hasVideoTexture)
@@ -369,10 +381,15 @@ public class VolPlayer : MonoBehaviour
                 return false;
             }
         }
-
-        string headerFile = Path.Combine(_fullGeomPath, "header.vols");
-        string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-        bool geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
+        bool geomOpened;
+        if(volFormat == VolEnums.VolFormat.Video) {
+            string headerFile = Path.Combine(_fullGeomPath, "header.vols");
+            string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+            geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
+        } else {
+            string headerFile = "";
+            geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, true);
+        }
         
         if (!geomOpened)
         {
@@ -567,8 +584,13 @@ public class VolPlayer : MonoBehaviour
         if ( frame >= _numFrames ) { return; }
 
         bool isKeyframe = VolPluginInterface.VolGeomIsKeyframe(frame);
+        string sequenceFile;
 
-        string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+        if(volFormat == VolEnums.VolFormat.Video)
+            sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+        else 
+            sequenceFile = _fullGeomPath;
+
         if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
         {
             Debug.LogError("Error loading geometry frame");

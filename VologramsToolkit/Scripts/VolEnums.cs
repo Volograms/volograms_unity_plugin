@@ -15,9 +15,20 @@ using UnityEngine;
 public static class VolEnums
 {
     /// <summary>
+    /// Enums referring to two Vols format versions
+    /// </summary>
+    [Serializable]
+    public enum VolFormat
+    {
+        Video,  // Texture encoded as a video
+        BasisU  //  All data (mesh + texture) in a single file 
+    }
+
+    /// <summary>
     /// Enums referring to the different paths made available through Unity
     /// Enables cross-platform paths
     /// </summary>
+    [Serializable]
     public enum PathType
     {
         Absolute,   // = string.Empty
@@ -25,6 +36,7 @@ public static class VolEnums
         Streaming,  // = Application.streamingAssetsPath
         Data        // = Application.dataPath
     }
+    
 
     /// <summary>
     /// Creates a full path from the enum path base and relative path
@@ -98,7 +110,7 @@ public static class VolEnums
     /// Refers to the type of log messages that the native code sends to Unity
     /// Is aligned with the `vol_geom_log_type_t` and `vol_av_log_type_t` enums
     /// </summary>
-    [Flags]
+    [Flags, Serializable]
     public enum LoggingLevel
     {
         None = 0,

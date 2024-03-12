@@ -18,8 +18,10 @@ public class VolPlayerEditor : Editor
 
     private const string OpenVolFolderFileCacheId = "VolPlayer_Editor_VolFolderFileOpenCache";
     private const string OpenVideoFileCacheId = "VolPlayer_Editor_VideoFileOpenCache";
+    private const string OpenVolsFileCacheId = "VolPlayer_Editor_VolsFileOpenCache";
     
     private readonly string[] _openVideoFileFilters = {"Video Files", "mp4,MP4"};
+    private readonly string[] _openVolsFileFilters = {"Vols Files", "vols"};
 
     private readonly GUIContent _pathHelpBoxGUIContent = new GUIContent(
         @"The 'Path Type' enum corresponds to Unity's path shortcuts:
@@ -56,18 +58,8 @@ Geom: Enables logging of geometry-related native code"
         EditorGUILayout.HelpBox(_debugLoggingHelpBoxGUIContent);
     }
 
-    public override void OnInspectorGUI()
+    private void DrawVideoPathSection() 
     {
-        EditorGUI.BeginChangeCheck();
-        
-        GUILayout.Label("Paths", EditorStyles.boldLabel);
-        _showPathHelp = EditorGUILayout.Foldout(_showPathHelp, "Path Help", EditorStyles.foldout);
-        if (_showPathHelp)
-        {
-            DrawPathHelpBox();
-        }
-        
-        EditorGUILayout.Separator();
         GUILayout.Label("Vol Folder", EditorStyles.label, GUILayout.ExpandWidth(true));
 
         _target.volFolderPathType = (VolEnums.PathType) EditorGUILayout.EnumPopup("Path Type:", _target.volFolderPathType, EditorStyles.popup);
@@ -122,6 +114,57 @@ Geom: Enables logging of geometry-related native code"
         if (GUILayout.Button("Reveal Video File in Finder"))
         {
             EditorUtility.RevealInFinder(_target.volVideoTexturePathType.ResolvePath(_target.volVideoTexture));
+        }
+    }
+
+    private void DrawBasisUPathSection() 
+    {       
+        EditorGUILayout.Separator();
+        GUILayout.Label("Vols File", EditorStyles.label);
+        _target.volFilePathType = (VolEnums.PathType) EditorGUILayout.EnumPopup("Path Type:", _target.volFilePathType, EditorStyles.popup);
+        GUILayout.Label("Path:");
+        _target.volFile = EditorGUILayout.TextField(_target.volFile, EditorStyles.textField);
+
+        if (GUILayout.Button("Open New Vols File"))
+        {
+            string cached = PlayerPrefs.GetString(OpenVolsFileCacheId, string.Empty);
+            string openedFile = EditorUtility.OpenFilePanelWithFilters("Open Vols File", cached, _openVolsFileFilters);
+            if (!string.IsNullOrEmpty(openedFile))
+            {
+                VolEnums.PathType selectedPathType = VolEnums.DeterminePathType(openedFile);
+                string selectedPath = selectedPathType == VolEnums.PathType.Absolute 
+                    ? openedFile 
+                    : openedFile.Remove(0, selectedPathType.ToPath().Length + 1);
+                _target.volFilePathType = selectedPathType;
+                _target.volFile = selectedPath;
+                PlayerPrefs.SetString(OpenVolsFileCacheId, Path.GetDirectoryName(openedFile) ?? string.Empty);
+                EditorUtility.SetDirty(target);
+            }
+        }
+        
+        if (GUILayout.Button("Reveal Vols File in Finder"))
+        {
+            EditorUtility.RevealInFinder(_target.volFilePathType.ResolvePath(_target.volFile));
+        }
+    }
+
+    public override void OnInspectorGUI()
+    {
+        EditorGUI.BeginChangeCheck();
+        
+        GUILayout.Label("Paths", EditorStyles.boldLabel);
+        _showPathHelp = EditorGUILayout.Foldout(_showPathHelp, "Path Help", EditorStyles.foldout);
+        if (_showPathHelp)
+        {
+            DrawPathHelpBox();
+        }
+        
+        EditorGUILayout.Separator();
+        _target.volFormat = (VolEnums.VolFormat)  EditorGUILayout.EnumPopup("Format:", _target.volFormat, EditorStyles.popup);
+        if(_target.volFormat == VolEnums.VolFormat.Video) {
+            DrawVideoPathSection();
+        } else {
+            DrawBasisUPathSection();
         }
 
         EditorGUILayout.Separator();

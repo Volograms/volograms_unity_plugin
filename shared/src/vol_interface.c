@@ -157,7 +157,12 @@ static vol_geom_frame_data_t geom_frame_data;
 DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* seq_filename, bool streaming_mode)
 {
     memset(&geom_file_ptr, 0, sizeof(vol_geom_info_t));
-    bool opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr, streaming_mode);
+    bool opened = false;
+    
+    if(hdr_filename[0] != '\0')
+        opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr, streaming_mode);
+    else 
+        opened = vol_geom_create_file_info_from_file(seq_filename, &geom_file_ptr);
     
     if ( !opened )
         return opened;
