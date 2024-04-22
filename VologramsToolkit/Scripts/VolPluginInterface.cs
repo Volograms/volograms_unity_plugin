@@ -98,11 +98,20 @@ public class VolPluginInterface
 
 
     //Basis Texture from Vols File
+    [DllImport(DLL, EntryPoint = "native_vol_basis_init")]
+    public static extern bool VolInitBasisDecoder();
+
     [DllImport(DLL, EntryPoint = "native_vol_read_next_texture_frame")]
-    public static extern IntPtr VolReadNextTextureFrame(bool flipVertical);
+    public static extern IntPtr VolReadNextTextureFrame(int format);
 
     [DllImport(DLL, EntryPoint = "native_vol_get_texture_frame_size")]
     public static extern long VolGetTextureSize();
+
+    [DllImport(DLL, EntryPoint = "native_vol_get_texture_width")]
+    public static extern int VolGetTextureWidth();
+
+    [DllImport(DLL, EntryPoint = "native_vol_get_texture_height")]
+    public static extern int VolGetTextureHeight();
 
 
     // Video file functions

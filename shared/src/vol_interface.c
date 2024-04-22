@@ -239,26 +239,40 @@ DllExport vol_geom_info_t native_vol_get_geom_info(void)
  */
 static uint8_t* output_blocks_ptr = 0;
 
+DllExport bool native_vol_basis_init(void)
+{
+    bool res = vol_basis_init();
+    if (!res) {
+        log_callback(4, "basis_init - vol_basis_init failed\n");
+        return false;
+    }
+    return true;
+}
+
+
 /** Read the next frame of the video
  @returns   Pointer to the video frame pixel data
  */
-DllExport uint8_t * native_vol_read_next_texture_frame( bool flip_vertical )
+DllExport uint8_t * native_vol_read_next_texture_frame( int format )
 {
     vol_geom_info_t vol_info = native_vol_get_geom_info();
     if(vol_info.hdr.textured) {
         
-        size_t texture_size = vol_info.hdr.texture_width * vol_info.hdr.texture_height;
+        uint32_t texture_size = vol_info.hdr.texture_width * vol_info.hdr.texture_height*3;
 
         if(output_blocks_ptr == 0)
             output_blocks_ptr = (uint8_t*)malloc( texture_size );
 
         vol_geom_frame_data_t vols_frame_data = native_vol_get_geom_ptr_data();
+
+        int w = 0, h = 0;
         uint8_t* vols_texture_ptr = (uint8_t*)&vols_frame_data.block_data_ptr[vols_frame_data.texture_offset];
-        size_t vols_texture_sz   = vols_frame_data.texture_sz; 
-        // TODO: replace 3 with texture format
-        if ( !vol_basis_transcode( 3, vols_texture_ptr, vols_texture_sz, output_blocks_ptr, texture_size, &(vol_info.hdr.texture_width), &(vol_info.hdr.texture_height)))
+        int32_t vols_texture_sz = vols_frame_data.texture_sz;
+
+        if (!vol_basis_transcode(format, vols_texture_ptr, vols_texture_sz, output_blocks_ptr, texture_size, &w, &h)) {
+            log_callback(3, "Decoding basis texture failed!");
             return 0;
-        
+        }
         return output_blocks_ptr;
     } else {
         return 0;
@@ -271,9 +285,27 @@ DllExport uint8_t * native_vol_read_next_texture_frame( bool flip_vertical )
 DllExport int64_t native_vol_get_texture_frame_size(void)
 {
     vol_geom_info_t vol_info = native_vol_get_geom_info();
-    return vol_info.hdr.texture_width * vol_info.hdr.texture_height;
+    return vol_info.hdr.texture_width * vol_info.hdr.texture_height*3;
 }
 
+
+/** Get the width in pixels of the video
+ @returns   The pixel width of the video
+ */
+DllExport int native_vol_get_texture_width(void)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_info.hdr.texture_width;
+}
+
+/** Get the height in pixels of the video
+ @returns   The pixel height of the video
+ */
+DllExport int native_vol_get_texture_height(void)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_info.hdr.texture_height;
+}
 
 /**
  * Video File
