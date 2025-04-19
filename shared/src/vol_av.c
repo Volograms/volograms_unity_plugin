@@ -20,6 +20,8 @@
 
 #define VOL_AV_LOG_STR_MAX_LEN 512 // Careful - this is stored on the stack to be thread and memory-safe so don't make it too large.
 
+#define LIBAVUTIL_VERSION_CHECK(maj, min, mic) (((LIBAVUTIL_VERSION_MAJOR >= maj) && (LIBAVUTIL_VERSION_MINOR >= min) && (LIBAVUTIL_VERSION_MICRO >= mic))? 1 : 0)
+
 /** Internal ffmepg-specific context variables. This struct lives inside the vol_av_video_t interface struct. */
 struct vol_av_internal_t {
   // Video File Codec Context
@@ -123,7 +125,11 @@ bool vol_av_open( const char* filename, vol_av_video_t* info_ptr ) {
         }
         _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Video Codec: resolution %dx%d\n", tmp_codec_params_ptr->width, tmp_codec_params_ptr->height );
       } else if ( tmp_codec_params_ptr->codec_type == AVMEDIA_TYPE_AUDIO ) {
+#if LIBAVUTIL_VERSION_CHECK(57, 28, 100)
+        _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Audio Codec: %d channels, sample rate %d\n", tmp_codec_params_ptr->ch_layout.nb_channels, tmp_codec_params_ptr->sample_rate );
+#else
         _vol_loggerf( VOL_AV_LOG_TYPE_DEBUG, "Audio Codec: %d channels, sample rate %d\n", tmp_codec_params_ptr->channels, tmp_codec_params_ptr->sample_rate );
+#endif
       }
 
       // print its name, id and bitrate
