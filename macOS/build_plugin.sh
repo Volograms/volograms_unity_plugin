@@ -12,9 +12,7 @@ xcodebuild clean build \
     -quiet \
     -project ./UnityPlugin/vol_unity_macos.xcodeproj \
     ONLY_ACTIVE_ARCH=NO \
-    VALID_ARCHS=x86_64 \
-    ARCHS=x86_64 \
-    -arch x86_64 \
+    -arch arm64 -arch x86_64 \
     -configuration "Release" \
     HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/include" \
     LIBRARY_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/lib" \
