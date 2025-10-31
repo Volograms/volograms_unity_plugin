@@ -37,7 +37,7 @@ namespace Volograms
         [Header("Playback Settings")]
         public bool playOnStart = true;
         public bool isLooping = true;
-        public bool audioOn = false;
+        public bool audioOn = true;
 
         [Header("Rendering Settings")]
         public Material material;
@@ -94,7 +94,7 @@ namespace Volograms
         audioOn = false;
 #endif
 
-            if (audioOn)
+            //if (audioOn)
             {
                 if (!TryGetComponent<VideoPlayer>(out _audioPlayerVideo))
                 {
@@ -106,13 +106,12 @@ namespace Volograms
                 }
             }
 
-            Open();
-
-            if (playOnStart)
-            {
-
-                Play();
-            }
+            Open(onComplete: () => {
+                if (playOnStart)
+                {
+                    Play();
+                }
+            });
         }
 
         /// <summary>
@@ -210,17 +209,22 @@ namespace Volograms
             System.IO.File.Delete(url);
         }
 
-
         /// <summary>
-        /// Open the given vologram files
+        /// Public method to Open the given vologram files
         /// </summary>
-        /// <returns>True if successful</returns>
-        public bool Open()
+        public void Open(System.Action onComplete = null)
+        {
+            StartCoroutine(OpenCoroutine(onComplete));
+        }
+
+        
+        public IEnumerator OpenCoroutine(System.Action onComplete = null)
         {
             if (IsOpen)
             {
                 Debug.LogWarning("Cannot open a vologram while another is open");
-                return false;
+                onComplete?.Invoke();
+                yield break;
             }
 
             VolPluginInterface.interfaceLoggingLevel = interfaceLoggingLevel;
@@ -242,7 +246,8 @@ namespace Volograms
                     {
                         IsOpen = false;
                         Close();
-                        return false;
+                        onComplete?.Invoke();
+                        yield break;
                     }
                 }
 
@@ -323,7 +328,7 @@ namespace Volograms
 
                         string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, "temp.mp3");
                         System.IO.File.WriteAllBytes(tempPath, audioBytes);
-                        StartCoroutine(LoadAudio(tempPath));
+                        yield return LoadAudio(tempPath);
                     }
                 }
             }
@@ -333,7 +338,8 @@ namespace Volograms
                     VolPluginInterface.VolCloseFile();
                 IsOpen = false;
                 Close();
-                return false;
+                onComplete?.Invoke();
+                yield break;
             }
 
             _currentlyLoadedFrameIndex = -1;
@@ -390,8 +396,7 @@ namespace Volograms
             _animationAccumulatedSeconds = 0f;
 
             IsOpen = true;
-            //VolPluginInterface.InitCommandBuffer();
-            return true;
+            onComplete?.Invoke();
         }
 
         /// <summary>
