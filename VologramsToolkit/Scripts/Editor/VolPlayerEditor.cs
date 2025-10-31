@@ -15,6 +15,9 @@ public class VolPlayerEditor : Editor
     private VolPlayer _target;
     private bool _showPathHelp;
     private bool _debugFoldout;
+    private bool _pathsFoldout;
+    private bool _playbackFoldout;
+    private bool _renderingFoldout;
 
     private const string OpenVolFolderFileCacheId = "VolPlayer_Editor_VolFolderFileOpenCache";
     private const string OpenVideoFileCacheId = "VolPlayer_Editor_VideoFileOpenCache";
@@ -60,15 +63,18 @@ Geom: Enables logging of geometry-related native code"
 
     private void DrawVideoPathSection() 
     {
-        GUILayout.Label("Vol Folder", EditorStyles.label, GUILayout.ExpandWidth(true));
+        GUILayout.Label("Vols Folder", EditorStyles.boldLabel, GUILayout.ExpandWidth(true));
+
+        EditorGUI.indentLevel++;
 
         _target.volFolderPathType = (VolEnums.PathType) EditorGUILayout.EnumPopup("Path Type:", _target.volFolderPathType, EditorStyles.popup);
-        GUILayout.Label("Path:");
+        EditorGUILayout.PrefixLabel("Path:");
+        EditorGUI.indentLevel++;
         _target.volFolder = EditorGUILayout.TextField(_target.volFolder, EditorStyles.textField);
-        
+        EditorGUI.indentLevel--;
         if (GUILayout.Button("Open New Vol Folder"))
         {
-            string cached = PlayerPrefs.GetString(OpenVolFolderFileCacheId, string.Empty);
+            string cached = PlayerPrefs.GetString(OpenVolFolderFileCacheId, _target.volFolderPathType.ResolvePath(_target.volFolder));
             string openedFolder = EditorUtility.OpenFolderPanel("Open Vol Folder", cached, string.Empty);
             if (!string.IsNullOrEmpty(openedFolder))
             {
@@ -87,16 +93,21 @@ Geom: Enables logging of geometry-related native code"
         {
             EditorUtility.RevealInFinder(_target.volFolderPathType.ResolvePath(_target.volFolder));
         }
-        
-        EditorGUILayout.Separator();
-        GUILayout.Label("Video Texture", EditorStyles.label);
-        _target.volVideoTexturePathType = (VolEnums.PathType) EditorGUILayout.EnumPopup("Path Type:", _target.volVideoTexturePathType, EditorStyles.popup);
-        GUILayout.Label("Path:");
-        _target.volVideoTexture = EditorGUILayout.TextField(_target.volVideoTexture, EditorStyles.textField);
+        EditorGUI.indentLevel--;
 
+        EditorGUILayout.Separator();
+        GUILayout.Label("Video Texture", EditorStyles.boldLabel);
+
+        EditorGUI.indentLevel++;
+        _target.volVideoTexturePathType = (VolEnums.PathType) EditorGUILayout.EnumPopup("Path Type:", _target.volVideoTexturePathType, EditorStyles.popup);
+        EditorGUILayout.PrefixLabel("Path:");
+        EditorGUI.indentLevel++;
+        _target.volVideoTexture = EditorGUILayout.TextField(_target.volVideoTexture, EditorStyles.textField);
+        EditorGUI.indentLevel--;
         if (GUILayout.Button("Open New Video File"))
         {
-            string cached = PlayerPrefs.GetString(OpenVideoFileCacheId, string.Empty);
+                            
+            string cached = PlayerPrefs.GetString(OpenVideoFileCacheId, _target.volVideoTexturePathType.ResolvePath(_target.volVideoTexture));
             string openedFile = EditorUtility.OpenFilePanelWithFilters("Open Video Texture", cached, _openVideoFileFilters);
             if (!string.IsNullOrEmpty(openedFile))
             {
@@ -115,19 +126,24 @@ Geom: Enables logging of geometry-related native code"
         {
             EditorUtility.RevealInFinder(_target.volVideoTexturePathType.ResolvePath(_target.volVideoTexture));
         }
+        EditorGUI.indentLevel--;
     }
 
     private void DrawBasisUPathSection() 
     {       
         EditorGUILayout.Separator();
-        GUILayout.Label("Vols File", EditorStyles.label);
+        GUILayout.Label("Vols File", EditorStyles.boldLabel);
+        EditorGUI.indentLevel++;
+
         _target.volFilePathType = (VolEnums.PathType) EditorGUILayout.EnumPopup("Path Type:", _target.volFilePathType, EditorStyles.popup);
-        GUILayout.Label("Path:");
+        EditorGUILayout.PrefixLabel("Path:", EditorStyles.label);
+        EditorGUI.indentLevel++;
         _target.volFile = EditorGUILayout.TextField(_target.volFile, EditorStyles.textField);
+        EditorGUI.indentLevel--;
 
         if (GUILayout.Button("Open New Vols File"))
         {
-            string cached = PlayerPrefs.GetString(OpenVolsFileCacheId, string.Empty);
+            string cached = PlayerPrefs.GetString(OpenVolsFileCacheId, _target.volFilePathType.ResolvePath(_target.volFile));
             string openedFile = EditorUtility.OpenFilePanelWithFilters("Open Vols File", cached, _openVolsFileFilters);
             if (!string.IsNullOrEmpty(openedFile))
             {
@@ -146,39 +162,59 @@ Geom: Enables logging of geometry-related native code"
         {
             EditorUtility.RevealInFinder(_target.volFilePathType.ResolvePath(_target.volFile));
         }
+        EditorGUI.indentLevel--;
     }
 
     public override void OnInspectorGUI()
     {
         EditorGUI.BeginChangeCheck();
-        
-        GUILayout.Label("Paths", EditorStyles.boldLabel);
-        _showPathHelp = EditorGUILayout.Foldout(_showPathHelp, "Path Help", EditorStyles.foldout);
-        if (_showPathHelp)
+
+        //GUILayout.Label("Paths", EditorStyles.boldLabel);
+        _pathsFoldout = EditorGUILayout.Foldout(_pathsFoldout, "Paths", EditorStyles.foldout);
+        if (_pathsFoldout)
         {
-            DrawPathHelpBox();
-        }
-        
-        EditorGUILayout.Separator();
-        _target.volFormat = (VolEnums.VolFormat)  EditorGUILayout.EnumPopup("Format:", _target.volFormat, EditorStyles.popup);
-        if(_target.volFormat == VolEnums.VolFormat.Video) {
-            DrawVideoPathSection();
-        } else {
-            DrawBasisUPathSection();
+            _showPathHelp = EditorGUILayout.Foldout(_showPathHelp, "Path Help", EditorStyles.foldout);
+            if (_showPathHelp)
+            {
+                DrawPathHelpBox();
+            }
+
+            EditorGUILayout.Separator();
+            _target.volFormat = (VolEnums.VolFormat)EditorGUILayout.EnumPopup("Format:", _target.volFormat, EditorStyles.popup);
+            if (_target.volFormat == VolEnums.VolFormat.Video) {
+                DrawVideoPathSection();
+            } else {
+                DrawBasisUPathSection();
+            }
         }
 
         EditorGUILayout.Separator();
-        GUILayout.Label("Playback Settings", EditorStyles.boldLabel);
+        
+       
+        //GUILayout.Label("Playback Settings", EditorStyles.boldLabel);
+        _playbackFoldout = EditorGUILayout.Foldout(_playbackFoldout, "Playback Settings", EditorStyles.foldout);
 
-        _target.playOnStart = EditorGUILayout.Toggle("Play On Start", _target.playOnStart);
-        _target.isLooping = EditorGUILayout.Toggle("Is Looping", _target.isLooping);
-        _target.audioOn = EditorGUILayout.Toggle("Audio On", _target.audioOn);
-        
+        if (_playbackFoldout)
+        {
+            EditorGUI.indentLevel++;
+            _target.playOnStart = EditorGUILayout.Toggle("Play On Start", _target.playOnStart);
+            _target.isLooping = EditorGUILayout.Toggle("Is Looping", _target.isLooping);
+            _target.audioOn = EditorGUILayout.Toggle("Audio On", _target.audioOn);
+            EditorGUI.indentLevel--;
+        }
+
+
         EditorGUILayout.Separator();
-        GUILayout.Label("Rendering Settings", EditorStyles.boldLabel);
-        _target.material = EditorGUILayout.ObjectField("Material", _target.material, typeof(Material), false) as Material;
-        _target.textureShaderId = EditorGUILayout.TextField("Texture Shader ID", _target.textureShaderId);
-        
+        _renderingFoldout = EditorGUILayout.Foldout(_renderingFoldout, "Rendering Settings", EditorStyles.foldout);
+        //GUILayout.Label("Rendering Settings", EditorStyles.boldLabel);
+        if (_renderingFoldout)
+        {
+            EditorGUI.indentLevel++;
+            _target.material = EditorGUILayout.ObjectField("Material", _target.material, typeof(Material), false) as Material;
+            _target.textureShaderId = EditorGUILayout.TextField("Texture Shader ID", _target.textureShaderId);
+            EditorGUI.indentLevel--;
+
+        }
         EditorGUILayout.Separator();
         _debugFoldout = EditorGUILayout.Foldout(_debugFoldout, "Debug Logging Options", EditorStyles.foldoutHeader);
         if (_debugFoldout)
