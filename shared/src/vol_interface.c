@@ -1,10 +1,11 @@
 /** @file vol_interface.c
  * Volograms SDK Audio-Video Decoding API
  *
- * Version:   0.1 \n
+ * Version:   0.2 \n
  * Authors:   Patrick Geoghegan <patrick@volograms.com> \n
  *            Anton Gerdelan <anton@volograms.com> \n
- * Copyright: 2021, Volograms (http://volograms.com/) \n
+ *            Jan Ondrej <jan@volograms.com> \n
+ * Copyright: 2021-2025, Volograms (http://volograms.com/) \n
  * Language:  C99 \n
  * Licence:   The MIT License. See LICENSE.md for details. \n
  */
@@ -197,7 +198,7 @@ DllExport int native_vol_get_geom_frame_count(void)
  */
 DllExport bool native_vol_read_geom_frame(const char* seq_filename, int frame) 
 {
-    if ( frame >= geom_file_ptr.hdr.frame_count )
+    if ( frame >= (int32_t) geom_file_ptr.hdr.frame_count )
         return false;
 
     bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, frame, &geom_frame_data );
@@ -234,6 +235,27 @@ DllExport vol_geom_info_t native_vol_get_geom_info(void)
     return geom_file_ptr;
 }
 
+/** Check if audio data is present in the vologram
+ * @returns   true if audio data is present, false otherwise
+ */
+DllExport bool native_vol_has_audio(void) {
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return (bool) vol_info.hdr.audio;
+}
+
+/** Get pointer to the audio data
+* @returns   Pointer to the audio data
+*/
+DllExport uint8_t* native_vol_get_audio(int* outSize)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    if (!vol_info.hdr.audio) {
+        return 0;
+    }
+	*outSize = vol_info.audio_data_sz;
+    return vol_info.audio_data_ptr;
+}
+
 /**
  * Basis Texture from Vols File
  */
@@ -248,7 +270,6 @@ DllExport bool native_vol_basis_init(void)
     }
     return true;
 }
-
 
 /** Read the next frame of the video
  @returns   Pointer to the video frame pixel data

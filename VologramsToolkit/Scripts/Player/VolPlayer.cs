@@ -12,6 +12,8 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Video;
+using UnityEngine.Networking;
+using System.Collections;
 
 [Serializable]
 [RequireComponent(typeof(MeshFilter))]
@@ -61,12 +63,13 @@ public class VolPlayer : MonoBehaviour
     private VolPluginInterface.VolGeometryData _geometryData;
     private byte[] _meshData;
     private int _textureId;
-    private VideoPlayer _audioPlayer;
+    private VideoPlayer _audioPlayerVideo;
+    private AudioSource _audioPlayerVols;
 
     public bool IsOpen { get; private set; }
     public bool IsPlaying { get; private set; }
     //public int Frame => _currentFrameIndex; // TODO(Anton) have i broken something here?
-    public bool IsMuted => audioOn && _audioPlayer != null && _audioPlayer.GetDirectAudioMute(0);
+    public bool IsMuted => audioOn && _audioPlayerVideo != null && _audioPlayerVideo.GetDirectAudioMute(0);
 
     /// <summary>
     /// Unity's Start function - called on the first frame
@@ -91,9 +94,13 @@ public class VolPlayer : MonoBehaviour
 
         if (audioOn)
         {
-            if (!TryGetComponent<VideoPlayer>(out _audioPlayer))
+            if (!TryGetComponent<VideoPlayer>(out _audioPlayerVideo))
             {
-                _audioPlayer = gameObject.AddComponent<VideoPlayer>();
+                _audioPlayerVideo = gameObject.AddComponent<VideoPlayer>();
+            }
+            if (!TryGetComponent<AudioSource>(out _audioPlayerVols))
+            {
+                _audioPlayerVols = gameObject.AddComponent<AudioSource>();
             }
         }
 
@@ -182,6 +189,28 @@ public class VolPlayer : MonoBehaviour
         Close();
     }
 
+    public IEnumerator LoadAudio(string url)
+    {
+        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG))
+        {
+            yield return www.SendWebRequest();
+
+            if (www.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                AudioClip clip = UnityEngine.Networking.DownloadHandlerAudioClip.GetContent(www);
+                _audioPlayerVols.clip = clip;
+                _audioPlayerVols.Play();
+                Debug.Log("Play audio");
+            }
+            else
+            {
+                Debug.LogError("Failed to load audio: " + www.error);
+            }
+        }
+        System.IO.File.Delete(url);
+    }
+    
+
     /// <summary>
     /// Open the given vologram files
     /// </summary>
@@ -219,27 +248,27 @@ public class VolPlayer : MonoBehaviour
 
             if (audioOn)
             {
-                _audioPlayer.Stop();
-                _audioPlayer.sendFrameReadyEvents = true;
-                _audioPlayer.source = VideoSource.Url;
-                _audioPlayer.url = _fullVideoPath;
+                _audioPlayerVideo.Stop();
+                _audioPlayerVideo.sendFrameReadyEvents = true;
+                _audioPlayerVideo.source = VideoSource.Url;
+                _audioPlayerVideo.url = _fullVideoPath;
 
-                _audioPlayer.frameReady -= AudioVideoPlayerOnFrameReady;
-                _audioPlayer.frameReady += AudioVideoPlayerOnFrameReady;
-                _audioPlayer.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
-                _audioPlayer.loopPointReached += AudioVideoPlayerOnLoopPointReached;
-                _audioPlayer.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
-                _audioPlayer.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
-                _audioPlayer.errorReceived -= AudioVideoPlayerOnErrorReceived;
-                _audioPlayer.errorReceived += AudioVideoPlayerOnErrorReceived;
+                _audioPlayerVideo.frameReady -= AudioVideoPlayerOnFrameReady;
+                _audioPlayerVideo.frameReady += AudioVideoPlayerOnFrameReady;
+                _audioPlayerVideo.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
+                _audioPlayerVideo.loopPointReached += AudioVideoPlayerOnLoopPointReached;
+                _audioPlayerVideo.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
+                _audioPlayerVideo.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
+                _audioPlayerVideo.errorReceived -= AudioVideoPlayerOnErrorReceived;
+                _audioPlayerVideo.errorReceived += AudioVideoPlayerOnErrorReceived;
 
-                _audioPlayer.renderMode = VideoRenderMode.APIOnly;
-                _audioPlayer.audioOutputMode = VideoAudioOutputMode.Direct;
-                _audioPlayer.EnableAudioTrack(0, true);
-                _audioPlayer.SetDirectAudioVolume(0, 1f);
-                _audioPlayer.SetDirectAudioMute(0, false);
-                _audioPlayer.controlledAudioTrackCount = 1;
-                _audioPlayer.Prepare();
+                _audioPlayerVideo.renderMode = VideoRenderMode.APIOnly;
+                _audioPlayerVideo.audioOutputMode = VideoAudioOutputMode.Direct;
+                _audioPlayerVideo.EnableAudioTrack(0, true);
+                _audioPlayerVideo.SetDirectAudioVolume(0, 1f);
+                _audioPlayerVideo.SetDirectAudioMute(0, false);
+                _audioPlayerVideo.controlledAudioTrackCount = 1;
+                _audioPlayerVideo.Prepare();
             }
         }
         else
@@ -282,6 +311,24 @@ public class VolPlayer : MonoBehaviour
                 VolPluginInterface.VolGetTextureWidth(),
                 VolPluginInterface.VolGetTextureHeight(),
                 textureFormat, false, false, true); // TODO(Jan): Set the texture format based on the platform
+
+            if (audioOn && VolPluginInterface.VolHasAudio())
+            {
+                int audioSize;
+                IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
+                Debug.Log(audioSize);
+                Debug.Log(VolPluginInterface.VolHasAudio());
+
+                if (audioData != IntPtr.Zero && audioSize > 0)
+                {
+                    byte[] audioBytes = new byte[audioSize];
+                    Marshal.Copy(audioData, audioBytes, 0, audioSize);
+
+                    string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, "temp.mp3");
+                    System.IO.File.WriteAllBytes(tempPath, audioBytes);
+                    StartCoroutine(LoadAudio(tempPath));
+                }
+            }
         }
         if (!geomOpened)
         {
@@ -365,7 +412,8 @@ public class VolPlayer : MonoBehaviour
 
         if (audioOn)
         {
-            _audioPlayer.Stop();
+            if(_audioPlayerVideo != null) _audioPlayerVideo.Stop();
+            if(_audioPlayerVols != null) _audioPlayerVols.Stop();
         }
 
         VolPluginInterface.ClearLoggingFunctions();
@@ -383,10 +431,9 @@ public class VolPlayer : MonoBehaviour
 
         IsPlaying = true;
 
-        if (audioOn && _audioPlayer != null)
-        {
-            _audioPlayer.Play();
-        }
+        if (audioOn && _audioPlayerVideo != null) _audioPlayerVideo.Play();
+        if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Play();
+
     }
 
     /// <summary>
@@ -399,10 +446,8 @@ public class VolPlayer : MonoBehaviour
 
         IsPlaying = false;
 
-        if (audioOn && _audioPlayer != null)
-        {
-            _audioPlayer.Pause();
-        }
+        if (audioOn && _audioPlayerVideo != null) _audioPlayerVideo.Pause();
+        if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Pause();
     }
 
     /// <summary>
@@ -490,10 +535,9 @@ public class VolPlayer : MonoBehaviour
     /// <param name="mute">Value for mute</param>
     public void SetMute(bool mute)
     {
-        if (audioOn && _audioPlayer != null)
-        {
-            _audioPlayer.SetDirectAudioMute(0, mute);
-        }
+        if (audioOn && _audioPlayerVideo != null) _audioPlayerVideo.SetDirectAudioMute(0, mute);
+        if (audioOn && _audioPlayerVols != null) _audioPlayerVols.mute = mute;
+
     }
 
     /// <summary>

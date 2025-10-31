@@ -4,12 +4,12 @@ This is the [Volograms](https://www.volograms.com/) SDK for Unity, in the form o
 
 ## Supported Platforms 
 
-* macOS - Excluding M1 Macs.
+* macOS - M1 Macs.
 * iOS
 * Windows
 * Android - Work-in-progress, expect issues!
 
-Support is planned for M1 macOS and GNU/Linux builds.
+<!-- Support is planned for M1 macOS and GNU/Linux builds. -->
 
 ## Getting Started
 

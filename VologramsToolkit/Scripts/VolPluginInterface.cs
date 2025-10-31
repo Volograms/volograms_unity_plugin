@@ -113,6 +113,13 @@ public class VolPluginInterface
     [DllImport(DLL, EntryPoint = "native_vol_get_texture_height")]
     public static extern int VolGetTextureHeight();
 
+    // Audio from vols file
+    [DllImport(DLL, EntryPoint = "native_vol_has_audio")]
+    public static extern bool VolHasAudio();
+
+    [DllImport(DLL, EntryPoint = "native_vol_get_audio")]
+    public static extern IntPtr VolGetAudio(out int outSize);
+
 
     // Video file functions
     [DllImport(DLL, EntryPoint = "native_vol_open_video_file")]

@@ -35,13 +35,24 @@ extern "C" {
 
 VOL_BASIS_EXPORT bool vol_basis_init( void );
 
+// keeping both versions for compatibility
 VOL_BASIS_EXPORT bool vol_basis_transcode( //
   int format,                              /// Matches transcoder_texture_format enum values from basisu_transcoder.h (cTFBC3_RGBA = 3)
   void* data_ptr,                          // Input: Basis-compressed data from sequence frame.
   uint32_t data_sz,                        // Input: Data size in bytes from sequence frame.
   uint8_t* output_blocks_ptr,              // Output: Transcoded compressed texture data to use.
   uint32_t output_blocks_sz,               //
-  int* w_ptr, int* h_ptr                   // Output: Dimensions of texture.
+  int* w_ptr, int* h_ptr                  // Output: Dimensions of texture.
+);
+
+VOL_BASIS_EXPORT bool vol_basis_transcode_v2( //
+  int format,                              /// Matches transcoder_texture_format enum values from basisu_transcoder.h (cTFBC3_RGBA = 3)
+  void* data_ptr,                          // Input: Basis-compressed data from sequence frame.
+  uint32_t data_sz,                        // Input: Data size in bytes from sequence frame.
+  uint8_t* output_blocks_ptr,              // Output: Transcoded compressed texture data to use.
+  uint32_t output_blocks_sz,               //
+  int* w_ptr, int* h_ptr,                  // Output: Dimensions of texture.
+  uint32_t* out_transcoded_sz_ptr          // Output: Size of texture data (of output_blocks_ptr)
 );
 
 #ifdef __cplusplus

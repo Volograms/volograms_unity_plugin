@@ -11,7 +11,7 @@ IF "%1" == "" OR "%2" == "" OR "%3" == "" (
 )
 
 REM Get the destination path relative to the project 
-SET relativeDest=..\..\..\UnityVol\Plugins\x64\
+SET relativeDest=..\..\..\VologramsToolkit\Plugins\x64\
 ECHO %relativeDest%
 
 REM Create the absolute path to the destination 
@@ -34,7 +34,8 @@ COPY %3 %destFile%
 
 REM Check that the ffmpeg path is not empty
 IF "%4" == "" (
-	ECHO Ffmpeg path empty
+	ECHO "FFMPEG path empty"
+
 	EXIT
 )
 
