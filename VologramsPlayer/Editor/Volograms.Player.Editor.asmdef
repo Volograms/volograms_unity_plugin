@@ -1,0 +1,18 @@
+{
+    "name": "Volograms.Player.Editor",
+    "rootNamespace": "Volograms",
+    "references": [
+        "GUID:3c93997360c43cb478f78136e844a8b0"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
