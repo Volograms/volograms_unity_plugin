@@ -1,12 +1,9 @@
 # Building the Unity Native Plugin for Windows
 
-Work in progress 
-
 ## Setting Up
 * Download [`ffmpeg`](https://ffmpeg.org/) from this [repo](https://github.com/BtbN/FFmpeg-Builds/releases)
 
-  * Download the build labelled like `ffmpeg-N-xxxxxx-xxxxxxxxxxx-win64-gpl-shared.zip` (Tested with a version Auto-Build 2023-10-31 13:06).
-  * TODO: Check other versions, 7.1 and 8.0, if they are also supported.
+  * Download the build labelled like `ffmpeg-n7.1.2-7-xxxxxxxxxxx-win64-gpl-shared-7.1.zip` (Tested with a version Auto-Build 2025-10-30 13:43).
 
 * Unzip the file and note where you place the extracted folder
 
@@ -63,10 +60,10 @@ Work in progress
 
 
 ## Post-build
-* After the dll has been built and moved to the Unity folder (`VologramsToolkit/Plugins/x64/`) the dll's dependencies must be added to that folder. 
+* After the dll has been built and moved to the Unity folder (`VologramsPlayer/Runtime/Plugins/x64/`) the dll's dependencies must be added to that folder. 
 * You can find them in the `ffmpeg_win/bin/` folder.
 * The [post-build script](/windows/vol_unity_lib_win/Scripts/post-build.bat) should copy all the dependencies. 
-* In case you need to check ensure the following files are in the `VologramsToolkit/Plugins/x64/` folder after the build
+* In case you need to check ensure the following files are in the `VologramsPlayer/Runtime/Plugins/x64/` folder after the build
       * `avcodec-xx.dll`
       * `avformat-xx.dll`
       * `avutil-xx.dll`
