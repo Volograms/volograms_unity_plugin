@@ -3,11 +3,11 @@
 ## Setting Up
 
 ### FFmpeg
-The Volograms Unity SDK uses builds from the [ffmpeg-android-maker](https://github.com/Javernaut/ffmpeg-android-maker) tool to build FFmpeg for Android. There is also a docker image available [here](https://github.com/Javernaut/ffmpeg-android-maker-docker) that can be used for the build process.
+The Volograms Unity SDK uses the [ffmpeg-android-maker](https://github.com/Javernaut/ffmpeg-android-maker) tool to build FFmpeg and the plugin for Android. There is also a docker image available [here](https://github.com/Javernaut/ffmpeg-android-maker-docker) that can be used for the build process.
 
-1. Clone ffmpeg-android-maker github repository
+1. Clone ffmpeg-android-maker github repository into the `shared/ffmpeg` folder
 2. Download the docker image `docker pull javernaut/ffmpeg-android-maker`
-3. Build FFmpeg for Android from the `ffmpeg-android-maker` folder using the command
+3. Build FFmpeg for Android from the `shared/ffmpeg/ffmpeg-android-maker` folder using the command
 ```shell
 docker run --rm -v /path/to/ffmpeg-android-maker:/mnt/ffmpeg-android-maker javernaut/ffmpeg-android-maker
 ```

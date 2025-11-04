@@ -71,7 +71,7 @@ namespace Volograms
         public bool IsOpen { get; private set; }
         public bool IsPlaying { get; private set; }
         //public int Frame => _currentFrameIndex; // TODO(Anton) have i broken something here?
-        public bool IsMuted => audioOn && _audioPlayerVideo != null && _audioPlayerVideo.GetDirectAudioMute(0);
+        //public bool IsMuted => audioOn;
 
         /// <summary>
         /// Unity's Start function - called on the first frame
@@ -90,9 +90,9 @@ namespace Volograms
         }
 #endif
 
-#if UNITY_ANDROID
-        audioOn = false;
-#endif
+//#if UNITY_ANDROID
+//        //audioOn = true;
+//#endif
 
             //if (audioOn)
             {
@@ -234,6 +234,8 @@ namespace Volograms
             VolPluginInterface.EnableAvLogging();
             VolPluginInterface.EnableGeomLogging();
 
+            bool geomOpened = false;
+
             if (VolEnums.VolFormat.Video == volFormat)
             {
                 _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
@@ -242,96 +244,115 @@ namespace Volograms
                 if (_hasVideoTexture)
                 {
                     bool openedVideo = VolPluginInterface.VolOpenFile(_fullVideoPath);
-                    if (!openedVideo)
+                    Debug.Log("Opened vologram video texture from: " + _fullVideoPath + " and " + openedVideo);
+                    if (openedVideo)
                     {
-                        IsOpen = false;
-                        Close();
-                        onComplete?.Invoke();
-                        yield break;
+                        // Audio
+                        if (audioOn)
+                        {
+                            _audioPlayerVideo.Stop();
+                            _audioPlayerVideo.sendFrameReadyEvents = true;
+                            _audioPlayerVideo.source = VideoSource.Url;
+                            _audioPlayerVideo.url = _fullVideoPath;
+
+                            _audioPlayerVideo.frameReady -= AudioVideoPlayerOnFrameReady;
+                            _audioPlayerVideo.frameReady += AudioVideoPlayerOnFrameReady;
+                            _audioPlayerVideo.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
+                            _audioPlayerVideo.loopPointReached += AudioVideoPlayerOnLoopPointReached;
+                            _audioPlayerVideo.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
+                            _audioPlayerVideo.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
+                            _audioPlayerVideo.errorReceived -= AudioVideoPlayerOnErrorReceived;
+                            _audioPlayerVideo.errorReceived += AudioVideoPlayerOnErrorReceived;
+
+                            _audioPlayerVideo.renderMode = VideoRenderMode.APIOnly;
+                            _audioPlayerVideo.audioOutputMode = VideoAudioOutputMode.Direct;
+                            _audioPlayerVideo.EnableAudioTrack(0, true);
+                            _audioPlayerVideo.SetDirectAudioVolume(0, 1f);
+                            _audioPlayerVideo.SetDirectAudioMute(0, false);
+                            _audioPlayerVideo.controlledAudioTrackCount = 1;
+                            _audioPlayerVideo.Prepare();
+                        }
+
+                        // Mesh
+                        _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
+                        string headerFile = Path.Combine(_fullGeomPath, "header.vols");
+                        string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+                        geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
+
+                        if (geomOpened)
+                        {
+                            // Texture
+                            _voloTexture = new Texture2D(
+                            VolPluginInterface.VolGetVideoWidth(),
+                            VolPluginInterface.VolGetVideoHeight(),
+                            TextureFormat.RGB24, false, false);
+                        }
                     }
                 }
-
-                if (audioOn)
-                {
-                    _audioPlayerVideo.Stop();
-                    _audioPlayerVideo.sendFrameReadyEvents = true;
-                    _audioPlayerVideo.source = VideoSource.Url;
-                    _audioPlayerVideo.url = _fullVideoPath;
-
-                    _audioPlayerVideo.frameReady -= AudioVideoPlayerOnFrameReady;
-                    _audioPlayerVideo.frameReady += AudioVideoPlayerOnFrameReady;
-                    _audioPlayerVideo.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
-                    _audioPlayerVideo.loopPointReached += AudioVideoPlayerOnLoopPointReached;
-                    _audioPlayerVideo.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
-                    _audioPlayerVideo.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
-                    _audioPlayerVideo.errorReceived -= AudioVideoPlayerOnErrorReceived;
-                    _audioPlayerVideo.errorReceived += AudioVideoPlayerOnErrorReceived;
-
-                    _audioPlayerVideo.renderMode = VideoRenderMode.APIOnly;
-                    _audioPlayerVideo.audioOutputMode = VideoAudioOutputMode.Direct;
-                    _audioPlayerVideo.EnableAudioTrack(0, true);
-                    _audioPlayerVideo.SetDirectAudioVolume(0, 1f);
-                    _audioPlayerVideo.SetDirectAudioMute(0, false);
-                    _audioPlayerVideo.controlledAudioTrackCount = 1;
-                    _audioPlayerVideo.Prepare();
-                }
-            }
-            else
-            {
-                bool initBasis = VolPluginInterface.VolInitBasisDecoder();
-                if (!initBasis)
-                {
-                    Debug.LogError("Failed to initialize Bassis texteure decoder.");
-                }
-            }
-
-            bool geomOpened;
-            if (volFormat == VolEnums.VolFormat.Video)
-            {
-                _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
-                string headerFile = Path.Combine(_fullGeomPath, "header.vols");
-                string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-                geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
-
-                _voloTexture = new Texture2D(
-                    VolPluginInterface.VolGetVideoWidth(),
-                    VolPluginInterface.VolGetVideoHeight(),
-                    TextureFormat.RGB24, false, false);
             }
             else
             {
                 string headerFile = "";
                 _fullGeomPath = volFilePathType.ResolvePath(volFile);
-                geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, true);
+                geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, false);
+                Debug.Log("Opened vologram geometry from: " + _fullGeomPath + " and " + geomOpened);
 
-#if UNITY_ANDROID
-        TextureFormat textureFormat = TextureFormat.ETC_RGB4;
-        // TextureFormat textureFormat = TextureFormat.ETC2_RGBA8;
-#elif UNITY_IOS
-        TextureFormat textureFormat = TextureFormat.ASTC_4x4;
-#else
-                TextureFormat textureFormat = TextureFormat.DXT1;
-#endif
-                _voloTexture = new Texture2D(
-                    VolPluginInterface.VolGetTextureWidth(),
-                    VolPluginInterface.VolGetTextureHeight(),
-                    textureFormat, false, false, true); // TODO(Jan): Set the texture format based on the platform
-
-                if (audioOn && VolPluginInterface.VolHasAudio())
+                if (geomOpened)
                 {
-                    int audioSize;
-                    IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
-                    if (audioData != IntPtr.Zero && audioSize > 0)
+                    bool initBasis = VolPluginInterface.VolInitBasisDecoder();
+                    if (!initBasis)
                     {
-                        byte[] audioBytes = new byte[audioSize];
-                        Marshal.Copy(audioData, audioBytes, 0, audioSize);
+                        Debug.LogError("Failed to initialize Bassis texteure decoder.");
+                    }
+                    else
+                    {
+#if UNITY_ANDROID
+                        TextureFormat textureFormat = TextureFormat.ETC_RGB4;
+                        //TextureFormat textureFormat = TextureFormat.ETC2_RGBA8;
+#elif UNITY_IOS
+                        TextureFormat textureFormat = TextureFormat.ASTC_4x4;
+#else
+                        TextureFormat textureFormat = TextureFormat.DXT1;
+#endif
+                        try
+                        {
+                            int texWidth = VolPluginInterface.VolGetTextureWidth();
+                            int texHeight = VolPluginInterface.VolGetTextureHeight();
 
-                        string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, "temp.mp3");
-                        System.IO.File.WriteAllBytes(tempPath, audioBytes);
-                        yield return LoadAudio(tempPath);
+                            Debug.Log("Texture width: " + texWidth);
+                            Debug.Log("Texture height: " + texHeight);
+
+                            if (texHeight > 0 && texWidth > 0)
+                            {
+                                _voloTexture = new Texture2D(
+                                    texWidth,
+                                    texHeight,
+                                    textureFormat, false, false, true); // TODO(Jan): Set the texture format based on the platform
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            _voloTexture = null;
+                            Debug.LogError("Failed to create vologram texture. " + e.Message);
+                        }
+                    }
+                    if (audioOn && VolPluginInterface.VolHasAudio())
+                    {
+                        int audioSize;
+                        IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
+                        if (audioData != IntPtr.Zero && audioSize > 0)
+                        {
+                            byte[] audioBytes = new byte[audioSize];
+                            Marshal.Copy(audioData, audioBytes, 0, audioSize);
+
+                            string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, "temp.mp3");
+                            System.IO.File.WriteAllBytes(tempPath, audioBytes);
+                            yield return LoadAudio(tempPath);
+                        }
                     }
                 }
             }
+            Debug.Log("Vols file loaded: " + geomOpened);
             if (!geomOpened)
             {
                 if (_hasVideoTexture)
@@ -386,12 +407,14 @@ namespace Volograms
 #endif
             }
 
+            if (_voloTexture)
+            {
 #if UNITY_EDITOR
-            _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);
+                _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);
 #else
-        _meshRenderer.material.SetTexture(_textureId, _voloTexture);
+                _meshRenderer.material.SetTexture(_textureId, _voloTexture);
 #endif
-
+            }
             _currentlyLoadedFrameIndex = -1;
             _animationAccumulatedSeconds = 0f;
 
@@ -666,13 +689,14 @@ namespace Volograms
             }
             // This is the frame we want, and we vertically flip this too.
             _colorPtr = VolPluginInterface.VolReadNextVideoFrame(true);
+            if(_voloTexture)
             { // Upload only the texture from the desired frame to the GPU via Unity.
                 _voloTexture.LoadRawTextureData(_colorPtr, (int)VolPluginInterface.VolGetFrameSize());
                 _voloTexture.Apply();
 #if UNITY_EDITOR
                 _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);
 #else
-            _meshRenderer.material.SetTexture(_textureId, _voloTexture);
+                _meshRenderer.material.SetTexture(_textureId, _voloTexture);
 #endif
             }
         }
@@ -697,7 +721,7 @@ namespace Volograms
             int textureFormat = 2;
 #endif
             _colorPtr = VolPluginInterface.VolReadNextTextureFrame(textureFormat);
-            if (_colorPtr != IntPtr.Zero)
+            if (_voloTexture && _colorPtr != IntPtr.Zero)
             { // Upload only the texture from the desired frame to the GPU via Unity.
                 _voloTexture.LoadRawTextureData(_colorPtr, (int)VolPluginInterface.VolGetTextureSize());
                 _voloTexture.Apply();
