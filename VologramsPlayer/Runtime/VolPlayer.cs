@@ -205,8 +205,7 @@ namespace Volograms
                 {
                     Debug.LogError("Failed to load audio: " + www.error);
                 }
-            }
-            System.IO.File.Delete(url);
+            }           
         }
 
         /// <summary>
@@ -281,10 +280,13 @@ namespace Volograms
 
                         if (geomOpened)
                         {
+                            int texWidth = VolPluginInterface.VolGetVideoWidth();
+                            int texHeight = VolPluginInterface.VolGetVideoHeight();
+
                             // Texture
                             _voloTexture = new Texture2D(
-                            VolPluginInterface.VolGetVideoWidth(),
-                            VolPluginInterface.VolGetVideoHeight(),
+                            texWidth,
+                            texHeight,
                             TextureFormat.RGB24, false, false);
                         }
                     }
@@ -319,9 +321,6 @@ namespace Volograms
                             int texWidth = VolPluginInterface.VolGetTextureWidth();
                             int texHeight = VolPluginInterface.VolGetTextureHeight();
 
-                            Debug.Log("Texture width: " + texWidth);
-                            Debug.Log("Texture height: " + texHeight);
-
                             if (texHeight > 0 && texWidth > 0)
                             {
                                 _voloTexture = new Texture2D(
@@ -345,9 +344,25 @@ namespace Volograms
                             byte[] audioBytes = new byte[audioSize];
                             Marshal.Copy(audioData, audioBytes, 0, audioSize);
 
-                            string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, "temp.mp3");
-                            System.IO.File.WriteAllBytes(tempPath, audioBytes);
-                            yield return LoadAudio(tempPath);
+                            // temporary local path for audio file so we can load it via UnityWebRequest
+                            string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, System.Guid.NewGuid().ToString() + "-audio.mp3");
+                            bool fileExists = false;
+                            try { 
+                                System.IO.File.WriteAllBytes(tempPath, audioBytes);
+                                fileExists = System.IO.File.Exists(tempPath);
+                            }
+                            catch (Exception e)
+                            {
+                                Debug.LogError("Failed to write audio file to temp path: " + e.Message);
+                            }
+                            if (fileExists)
+                            {
+                                string uri = "file://" + tempPath;
+                                yield return LoadAudio(uri);
+
+                                // cleanup
+                                System.IO.File.Delete(tempPath);
+                            }
                         }
                     }
                 }

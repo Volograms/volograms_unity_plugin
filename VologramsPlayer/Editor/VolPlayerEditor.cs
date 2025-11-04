@@ -278,13 +278,13 @@ Geom: Enables logging of geometry-related native code"
 
             }
 
-#if UNITY_ANDROID
-        if (_target.audioOn)
-        {
-            EditorGUILayout.HelpBox("Audio in Android is still a work in progress. " +
-                                    "Audio is disabled in Android builds.", MessageType.Warning, true);
-        }
-#endif
+//#if UNITY_ANDROID
+//        if (_target.audioOn)
+//        {
+//            EditorGUILayout.HelpBox("Audio in Android is still a work in progress. " +
+//                                    "Audio is disabled in Android builds.", MessageType.Warning, true);
+//        }
+//#endif
         }
 
     }
