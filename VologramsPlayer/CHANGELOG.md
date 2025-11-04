@@ -2,6 +2,9 @@ Volograms Unity SDK Release Notes
 
 Check the README in the for information on the VolPlayer component and FAQs
 
+**v1.0.1** (04-11-25)
+* Add support for Android.
+
 **v1.0.0** (31-10-25)
 * Add support for the new single-vols file that includes texture and audio.
 * New folder structure allowing for installation as a package. 
