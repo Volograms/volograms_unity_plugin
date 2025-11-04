@@ -1,3 +1,2 @@
-VologramsToolkit/Plugins/*
-UnityVol/Plugins/x64/vol_unity_lib_win.dll
 *.vcxproj
+*.vs

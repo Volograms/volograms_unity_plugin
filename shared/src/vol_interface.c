@@ -1,10 +1,11 @@
 /** @file vol_interface.c
  * Volograms SDK Audio-Video Decoding API
  *
- * Version:   0.1 \n
+ * Version:   0.2 \n
  * Authors:   Patrick Geoghegan <patrick@volograms.com> \n
  *            Anton Gerdelan <anton@volograms.com> \n
- * Copyright: 2021, Volograms (http://volograms.com/) \n
+ *            Jan Ondrej <jan@volograms.com> \n
+ * Copyright: 2021-2025, Volograms (http://volograms.com/) \n
  * Language:  C99 \n
  * Licence:   The MIT License. See LICENSE.md for details. \n
  */
@@ -30,6 +31,7 @@
 
 #include "vol_av.h"
 #include "vol_geom.h"
+#include "vol_basis.h"
 
 #ifdef _WIN32
 #define DllExport __declspec (dllexport)
@@ -157,7 +159,12 @@ static vol_geom_frame_data_t geom_frame_data;
 DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* seq_filename, bool streaming_mode)
 {
     memset(&geom_file_ptr, 0, sizeof(vol_geom_info_t));
-    bool opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr, streaming_mode);
+    bool opened = false;
+
+    if(hdr_filename[0] != '\0')
+        opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr, streaming_mode);
+    else 
+        opened = vol_geom_create_file_info_from_file(seq_filename, &geom_file_ptr);
     
     if ( !opened )
         return opened;
@@ -191,7 +198,7 @@ DllExport int native_vol_get_geom_frame_count(void)
  */
 DllExport bool native_vol_read_geom_frame(const char* seq_filename, int frame) 
 {
-    if ( frame >= geom_file_ptr.hdr.frame_count )
+    if ( frame >= (int32_t) geom_file_ptr.hdr.frame_count )
         return false;
 
     bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, frame, &geom_frame_data );
@@ -226,6 +233,99 @@ DllExport vol_geom_frame_data_t native_vol_get_geom_ptr_data(void)
 DllExport vol_geom_info_t native_vol_get_geom_info(void)
 {
     return geom_file_ptr;
+}
+
+/** Check if audio data is present in the vologram
+ * @returns   true if audio data is present, false otherwise
+ */
+DllExport bool native_vol_has_audio(void) {
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return (bool) vol_info.hdr.audio;
+}
+
+/** Get pointer to the audio data
+* @returns   Pointer to the audio data
+*/
+DllExport uint8_t* native_vol_get_audio(int* outSize)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    if (!vol_info.hdr.audio) {
+        return 0;
+    }
+	*outSize = vol_info.audio_data_sz;
+    return vol_info.audio_data_ptr;
+}
+
+/**
+ * Basis Texture from Vols File
+ */
+static uint8_t* output_blocks_ptr = 0;
+
+DllExport bool native_vol_basis_init(void)
+{
+    bool res = vol_basis_init();
+    if (!res) {
+        log_callback(4, "basis_init - vol_basis_init failed\n");
+        return false;
+    }
+    return true;
+}
+
+/** Read the next frame of the video
+ @returns   Pointer to the video frame pixel data
+ */
+DllExport uint8_t * native_vol_read_next_texture_frame( int format )
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    if(vol_info.hdr.textured) {
+        
+        uint32_t texture_size = vol_info.hdr.texture_width * vol_info.hdr.texture_height*3;
+
+        if(output_blocks_ptr == 0)
+            output_blocks_ptr = (uint8_t*)malloc( texture_size );
+
+        vol_geom_frame_data_t vols_frame_data = native_vol_get_geom_ptr_data();
+
+        int w = 0, h = 0;
+        uint8_t* vols_texture_ptr = (uint8_t*)&vols_frame_data.block_data_ptr[vols_frame_data.texture_offset];
+        int32_t vols_texture_sz = vols_frame_data.texture_sz;
+
+        if (!vol_basis_transcode(format, vols_texture_ptr, vols_texture_sz, output_blocks_ptr, texture_size, &w, &h)) {
+            log_callback(3, "Decoding basis texture failed!");
+            return 0;
+        }
+        return output_blocks_ptr;
+    } else {
+        return 0;
+    }
+}
+
+/** Get the size of a video frame in bytes
+ @returns   The number of bytes in a video frame
+ */
+DllExport int64_t native_vol_get_texture_frame_size(void)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_info.hdr.texture_width * vol_info.hdr.texture_height*3;
+}
+
+
+/** Get the width in pixels of the video
+ @returns   The pixel width of the video
+ */
+DllExport int native_vol_get_texture_width(void)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_info.hdr.texture_width;
+}
+
+/** Get the height in pixels of the video
+ @returns   The pixel height of the video
+ */
+DllExport int native_vol_get_texture_height(void)
+{
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_info.hdr.texture_height;
 }
 
 /**

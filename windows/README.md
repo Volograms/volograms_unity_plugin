@@ -1,15 +1,17 @@
 # Building the Unity Native Plugin for Windows
 
-Work in progress 
-
 ## Setting Up
 * Download [`ffmpeg`](https://ffmpeg.org/) from this [repo](https://github.com/BtbN/FFmpeg-Builds/releases)
-      * Download the build labelled like `ffmpeg-N-xxxxxx-xxxxxxxxxxx-win64-gpl-shared.zip`
-      * Unzip the file and note where you place the extracted folder
-      * In this document `ffmpeg_win` refers to the location of ffmpeg on your machine  
+
+  * Download the build labelled like `ffmpeg-n7.1.2-7-xxxxxxxxxxx-win64-gpl-shared-7.1.zip` (Tested with a version Auto-Build 2025-10-30 13:43).
+
+* Unzip the file and note where you place the extracted folder
+
+* In this document `ffmpeg_win` refers to the location of ffmpeg on your machine  
+  * This can be defined inside the `vol_unity_win_property_sheet` project properties under `User Macros`.
 
 ## Project Layout
-* Open the `vol_unity_lib_win.sln` solution in Visual Studio
+* Open the `vol_unity_lib_win.sln` solution in Visual Studio (2022 is recommended).
 * The project hierarchy looks like this:
 
 ![Win Project Hierarchy](/readme_resources/image-19.png)
@@ -58,10 +60,10 @@ Work in progress
 
 
 ## Post-build
-* After the dll has been built and moved to the Unity folder (`UnityVol/Plugins/x64/`) the dll's dependencies must be added to that folder. 
+* After the dll has been built and moved to the Unity folder (`VologramsPlayer/Runtime/Plugins/x64/`) the dll's dependencies must be added to that folder. 
 * You can find them in the `ffmpeg_win/bin/` folder.
 * The [post-build script](/windows/vol_unity_lib_win/Scripts/post-build.bat) should copy all the dependencies. 
-* In case you need to check ensure the following files are in the `UnityVol/Plugins/x64/` folder after the build
+* In case you need to check ensure the following files are in the `VologramsPlayer/Runtime/Plugins/x64/` folder after the build
       * `avcodec-xx.dll`
       * `avformat-xx.dll`
       * `avutil-xx.dll`
