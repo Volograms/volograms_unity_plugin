@@ -125,6 +125,7 @@ LOCAL_ARM_MODE  			:= arm
 LOCAL_PATH      			:= $(ANDROID_NDK_HOME)
 LOCAL_CFLAGS    			:= -DBASISD_SUPPORT_KTX2=0 #-DANDROID_DEBUG  #-Werror 
 LOCAL_LDLIBS    			:= -llog
+LOCAL_LDFLAGS               += -Wl,-z,max-page-size=16384
 ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
     LOCAL_C_INCLUDES := $(FFMPEG_KIT)/arm64-v8a/include 
 endif
