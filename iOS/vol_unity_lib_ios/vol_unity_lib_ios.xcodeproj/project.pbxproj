@@ -3,10 +3,12 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 53;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3D303CD92EBBAB3B0010B046 /* vol_basis.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D303CD82EBBAB3B0010B046 /* vol_basis.cpp */; };
+		3D303CDB2EBBAB4D0010B046 /* basisu_transcoder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D303CDA2EBBAB4D0010B046 /* basisu_transcoder.cpp */; };
 		87B7976426BD8934003B51F1 /* vol_av.c in Sources */ = {isa = PBXBuildFile; fileRef = 879399DC26BC17260023C8DE /* vol_av.c */; platformFilter = ios; };
 		87B7976526BD8936003B51F1 /* vol_geom.c in Sources */ = {isa = PBXBuildFile; fileRef = 879399DA26BC17260023C8DE /* vol_geom.c */; platformFilter = ios; };
 		87B7976626BD8C46003B51F1 /* vol_geom.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 879399D826BC17260023C8DE /* vol_geom.h */; platformFilter = ios; };
@@ -45,6 +47,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3D303CD72EBBAB3B0010B046 /* vol_basis.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = vol_basis.h; sourceTree = "<group>"; };
+		3D303CD82EBBAB3B0010B046 /* vol_basis.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = vol_basis.cpp; sourceTree = "<group>"; };
+		3D303CDA2EBBAB4D0010B046 /* basisu_transcoder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = basisu_transcoder.cpp; path = /Users/jan/code/volograms/volograms_unity_plugin/shared/thirdparty/basis_universal/transcoder/basisu_transcoder.cpp; sourceTree = "<absolute>"; };
 		879399CB26BC16FD0023C8DE /* libvol_unity_lib_ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libvol_unity_lib_ios.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		879399D826BC17260023C8DE /* vol_geom.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = vol_geom.h; sourceTree = "<group>"; };
 		879399D926BC17260023C8DE /* vol_av.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = vol_av.h; sourceTree = "<group>"; };
@@ -116,6 +121,9 @@
 		879399D726BC17260023C8DE /* src */ = {
 			isa = PBXGroup;
 			children = (
+				3D303CDA2EBBAB4D0010B046 /* basisu_transcoder.cpp */,
+				3D303CD72EBBAB3B0010B046 /* vol_basis.h */,
+				3D303CD82EBBAB3B0010B046 /* vol_basis.cpp */,
 				CDA24C8C278C954100B646E9 /* vol_interface.c */,
 				879399D826BC17260023C8DE /* vol_geom.h */,
 				879399D926BC17260023C8DE /* vol_av.h */,
@@ -206,8 +214,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3D303CD92EBBAB3B0010B046 /* vol_basis.cpp in Sources */,
 				87B7976526BD8936003B51F1 /* vol_geom.c in Sources */,
 				87B7976426BD8934003B51F1 /* vol_av.c in Sources */,
+				3D303CDB2EBBAB4D0010B046 /* basisu_transcoder.cpp in Sources */,
 				CDA24C8D278C954100B646E9 /* vol_interface.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -257,6 +267,7 @@
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
+					"BASISD_SUPPORT_KTX2=0",
 					"DEBUG=1",
 					"$(inherited)",
 				);
@@ -267,7 +278,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LIBRARY_SEARCH_PATHS = "";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -316,6 +327,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "BASISD_SUPPORT_KTX2=0";
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -323,7 +335,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LIBRARY_SEARCH_PATHS = "";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
