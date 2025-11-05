@@ -2,7 +2,7 @@ fileFormatVersion: 2
 guid: 00457ef0bb14e7d4d8e41ab31682499a
 PluginImporter:
   externalObjects: {}
-  serializedVersion: 3
+  serializedVersion: 2
   iconMap: {}
   executionOrder: {}
   defineConstraints: []
@@ -11,14 +11,14 @@ PluginImporter:
   isExplicitlyReferenced: 0
   validateReferences: 1
   platformData:
-    Android:
-      enabled: 1
-      settings:
-        AndroidLibraryDependee: UnityLibrary
-        AndroidSharedLibraryType: Executable
-        CPU: ARMv7
-        Is16KbAligned: false
-    Any:
+  - first:
+      : 
+    second:
+      enabled: 0
+      settings: {}
+  - first:
+      : Any
+    second:
       enabled: 0
       settings:
         Exclude Android: 0
@@ -27,28 +27,18 @@ PluginImporter:
         Exclude OSXUniversal: 1
         Exclude Win: 1
         Exclude Win64: 1
-    Editor:
+        Exclude iOS: 1
+  - first:
+      Android: Android
+    second:
+      enabled: 1
+      settings: {}
+  - first:
+      Editor: Editor
+    second:
       enabled: 0
       settings:
-        CPU: AnyCPU
         DefaultValueInitialized: true
-        OS: AnyOS
-    Linux64:
-      enabled: 0
-      settings:
-        CPU: None
-    OSXUniversal:
-      enabled: 0
-      settings:
-        CPU: None
-    Win:
-      enabled: 0
-      settings:
-        CPU: None
-    Win64:
-      enabled: 0
-      settings:
-        CPU: None
   userData: 
   assetBundleName: 
   assetBundleVariant: 
