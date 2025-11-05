@@ -2,6 +2,9 @@ Volograms Unity SDK Release Notes
 
 Check the README in the for information on the VolPlayer component and FAQs
 
+**v1.0.2** (05-11-25)
+* Add support for Mac OS.
+
 **v1.0.1** (04-11-25)
 * Add support for Android.
 

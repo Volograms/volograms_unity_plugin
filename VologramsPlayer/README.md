@@ -1,14 +1,10 @@
 # Volograms Unity Player 
-Version 1.0.1
+Version 1.0.2
 
 ## Supported Platforms 
-* iOS
-* MacOS (excluding Macs with M1 chips)
+* MacOS
 * Windows 
-* Android (WORK IN PROGRESS, EXPECT ISSUES)
-
-### Android 
-The Android version of the player is still a work in progress. Please expect performance issues and no audio. These issues are currently being worked on. 
+* Android
 
 ## `Vol Player` Component Inspector
 
@@ -32,7 +28,6 @@ The Android version of the player is still a work in progress. Please expect per
 | `Enable Geom Logging`             | Enum          | Enables logging of geometry-related native code  | 
 
 **\* NOTES:** 
-* Audio is still a work in progress on Android and so **audio is disabled for android builds**.
 * When changing the Material in runtime, it is better to use the `ChangeMaterial` function (see below).
 
 When the Unity Editor is in play mode, buttons will appear in the inspector that you can use to test different volograms 
