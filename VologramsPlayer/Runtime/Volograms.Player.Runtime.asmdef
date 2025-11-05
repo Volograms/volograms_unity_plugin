@@ -2,7 +2,11 @@
     "name": "Volograms.Player.Runtime",
     "rootNamespace": "Volograms",
     "references": [],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "WindowsStandalone64"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
