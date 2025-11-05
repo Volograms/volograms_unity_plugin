@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3D303CD02EBB99A50010B046 /* vol_basis.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D303CCF2EBB99A50010B046 /* vol_basis.cpp */; };
+		3D303CD62EBB9C490010B046 /* basisu_transcoder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D303CD52EBB9C490010B046 /* basisu_transcoder.cpp */; };
 		871FC0DB26B2AE09002D6F50 /* vol_geom.c in Sources */ = {isa = PBXBuildFile; fileRef = 871FC0D926B2AE09002D6F50 /* vol_geom.c */; };
 		87AC777826AEC29100E2F9E1 /* vol_av.c in Sources */ = {isa = PBXBuildFile; fileRef = 87AC76D726AEC29100E2F9E1 /* vol_av.c */; };
 		CDA24C90278DA0CB00B646E9 /* vol_interface.c in Sources */ = {isa = PBXBuildFile; fileRef = CDA24C8F278DA0CB00B646E9 /* vol_interface.c */; };
@@ -26,6 +28,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3D303CCE2EBB99A50010B046 /* vol_basis.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = vol_basis.h; sourceTree = "<group>"; };
+		3D303CCF2EBB99A50010B046 /* vol_basis.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = vol_basis.cpp; sourceTree = "<group>"; };
+		3D303CD52EBB9C490010B046 /* basisu_transcoder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = basisu_transcoder.cpp; path = /Users/jan/code/volograms/volograms_unity_plugin/shared/thirdparty/basis_universal/transcoder/basisu_transcoder.cpp; sourceTree = "<absolute>"; };
 		871FC0D926B2AE09002D6F50 /* vol_geom.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vol_geom.c; sourceTree = "<group>"; };
 		871FC0DA26B2AE09002D6F50 /* vol_geom.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vol_geom.h; sourceTree = "<group>"; };
 		87AC76D626AEC29100E2F9E1 /* vol_av.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vol_av.h; sourceTree = "<group>"; };
@@ -49,11 +54,14 @@
 		87AC747B26AEAD5200E2F9E1 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				3D303CCE2EBB99A50010B046 /* vol_basis.h */,
+				3D303CCF2EBB99A50010B046 /* vol_basis.cpp */,
 				CDA24C8F278DA0CB00B646E9 /* vol_interface.c */,
 				87AC76D726AEC29100E2F9E1 /* vol_av.c */,
 				87AC76D626AEC29100E2F9E1 /* vol_av.h */,
 				871FC0D926B2AE09002D6F50 /* vol_geom.c */,
 				871FC0DA26B2AE09002D6F50 /* vol_geom.h */,
+				3D303CD52EBB9C490010B046 /* basisu_transcoder.cpp */,
 			);
 			name = src;
 			path = ../../shared/src;
@@ -160,8 +168,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3D303CD02EBB99A50010B046 /* vol_basis.cpp in Sources */,
 				871FC0DB26B2AE09002D6F50 /* vol_geom.c in Sources */,
 				87AC777826AEC29100E2F9E1 /* vol_av.c in Sources */,
+				3D303CD62EBB9C490010B046 /* basisu_transcoder.cpp in Sources */,
 				CDA24C90278DA0CB00B646E9 /* vol_interface.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -212,6 +222,7 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
+					"BASISD_SUPPORT_KTX2=0",
 					"$(inherited)",
 				);
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -267,6 +278,10 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"BASISD_SUPPORT_KTX2=0",
+					"$(inherited)",
+				);
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;

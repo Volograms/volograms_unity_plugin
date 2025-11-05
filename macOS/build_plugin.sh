@@ -14,14 +14,14 @@ xcodebuild clean build \
     ONLY_ACTIVE_ARCH=NO \
     -arch arm64 -arch x86_64 \
     -configuration "Release" \
-    HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/include" \
+    HEADER_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/include ../../shared/thirdparty/" \
     LIBRARY_SEARCH_PATHS="${FFMPEG_KIT}/prebuilt/bundle-apple-universal-macos/ffmpeg/lib" \
     OTHER_CFLAGS="-DDISABLE_LOGGING" \
     OTHER_LDFLAGS="-framework CoreFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lswscale -lswresample"
 
-mkdir -p ../VologramsToolkit/Plugins/MacOS
+mkdir -p ../VologramsPlayer/Runtime/Plugins/MacOS
 
-cp -R ./UnityPlugin/build/Release/volplayer.bundle ../VologramsToolkit/Plugins/MacOS/
+cp -R ./UnityPlugin/build/Release/volplayer.bundle ../VologramsPlayer/Runtime/Plugins/MacOS/
 
 rm -r ./UnityPlugin/build/
 
