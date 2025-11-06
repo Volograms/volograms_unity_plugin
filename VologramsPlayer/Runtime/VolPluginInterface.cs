@@ -98,6 +98,9 @@ namespace Volograms
         [DllImport(DLL, EntryPoint = "native_vol_get_geom_ptr_data")]
         public static extern VolGeometryData VolGeomGetPtrData();
 
+        [DllImport(DLL, EntryPoint = "native_vol_update_frames_directory")]
+        public static extern bool VolGeomUpdateFramesDirectory(string seq_filename, int frame);
+
 
         //Basis Texture from Vols File
         [DllImport(DLL, EntryPoint = "native_vol_basis_init")]

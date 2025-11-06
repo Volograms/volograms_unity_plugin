@@ -256,6 +256,16 @@ DllExport uint8_t* native_vol_get_audio(int* outSize)
     return vol_info.audio_data_ptr;
 }
 
+/** Update missing items in frames directory initially created by vol_geom_create_file_info_from_file.
+ @param seq_filename    Path to the sequence file
+ @param frame           Index of the frame you want to update
+ @returns               If the operation was a success
+ */
+DllExport bool native_vol_update_frames_directory(const char* seq_filename, int frame) {
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_geom_update_frames_directory(seq_filename, &vol_info, frame);
+}
+
 /**
  * Basis Texture from Vols File
  */

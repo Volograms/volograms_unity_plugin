@@ -5,14 +5,15 @@
 // <date>18/02/22</date>
 // <summary>Controls for vologram playback</summary>
 
+using Codice.Utils;
 using System;
+using System.Collections;
 using System.IO;
 using System.Runtime.InteropServices;
 using Unity.Collections;
 using UnityEngine;
-using UnityEngine.Video;
 using UnityEngine.Networking;
-using System.Collections;
+using UnityEngine.Video;
 
 
 namespace Volograms
@@ -22,6 +23,20 @@ namespace Volograms
     [RequireComponent(typeof(MeshRenderer))]
     public class VolPlayer : MonoBehaviour
     {
+        [Header("Streaming Settings (Single-file format only)")]
+        [Tooltip("Enable streaming for large files. Only works with single .vols files.")]
+        public bool enableStreaming = true;
+
+        [Tooltip("File: Stream to disk (mobile-friendly). Buffer: Stream to memory (faster seeking).")]
+        public VolEnums.StreamingMode streamingMode = VolEnums.StreamingMode.File;
+
+        // Private streaming state
+        private bool _isStreaming = false;
+        private bool _isBuffering = false;
+        private Coroutine _downloadCoroutine;
+        //private string _streamingFilePath;
+        private int _framesDownloaded = 0;
+
         [Header("Paths")]
         public VolEnums.PathType volFolderPathType;
         public string volFolder;
@@ -119,13 +134,17 @@ namespace Volograms
         /// </summary>
         private void Update()
         {
-            if (!IsPlaying) return;
+            if (IsPlaying && !_isBuffering)
+            {
+                // Work out the frame index to play based on elapsed animation time. This lets us skip to the correct frame when the player is going slowly.
+                _animationAccumulatedSeconds += Time.deltaTime;
+            }
 
-            // Work out the frame index to play based on elapsed animation time. This lets us skip to the correct frame when the player is going slowly.
-            _animationAccumulatedSeconds += Time.deltaTime;
             int desiredFrameIndex = (int)(_animationAccumulatedSeconds / _secondsPerFrame);
             // Not enough time has passed to advance to the next frame yet.
-            if (desiredFrameIndex == _currentlyLoadedFrameIndex) { return; }
+            if (desiredFrameIndex == _currentlyLoadedFrameIndex || desiredFrameIndex < 0) { return; }
+
+            Debug.Log("Desired Frame Index: " + desiredFrameIndex);
 
             if (desiredFrameIndex >= _numFrames)
             {
@@ -140,31 +159,48 @@ namespace Volograms
                 }
                 return;
             }
+
+
+            // Streaming-aware frame check
+            bool isFrameAvailable = false;
+            if (_isStreaming)
+            {
+                isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, desiredFrameIndex);
+                if (!isFrameAvailable)
+                {
+                    // Still downloading - pause plauyback until we have enough data.
+                    Debug.LogWarning($"Buffering... waiting for frame {desiredFrameIndex}");
+                    _isBuffering = true;
+                    return;
+                } else
+                {
+                    _isBuffering = false;
+                }
+            }
+            //return;
+
+
             // --VIDEO TEXTURE--
             // Always skip video frames to desired frame.
             if (volFormat == VolEnums.VolFormat.Video)
             {
                 ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
-                { // --GEOMETRY--
-                    int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
-                    bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
-                    // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
-                    // unless it is a keyframe itself.
-                    bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
-                    if (needToLoadKeyframe) { ReadGeomFrame(previousKeyframeIndex); }
-                    ReadGeomFrame(desiredFrameIndex);
-                }
             }
-            else
+             
+            // --GEOMETRY--
+            int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
+            bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
+            // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
+            // unless it is a keyframe itself.
+            bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
+            if (needToLoadKeyframe) { 
+                if(!ReadGeomFrame(previousKeyframeIndex)) return; 
+            }
+            if (!ReadGeomFrame(desiredFrameIndex)) return;
+
+            // --BASISU TEXTURE--
+            if (volFormat == VolEnums.VolFormat.BasisU)
             {
-                // --GEOMETRY--
-                int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
-                bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
-                // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
-                // unless it is a keyframe itself.
-                bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
-                if (needToLoadKeyframe) { ReadGeomFrame(previousKeyframeIndex); }
-                ReadGeomFrame(desiredFrameIndex);
                 // Swap the order - mesh first, texture next
                 ReadTextureFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
             }
@@ -190,6 +226,11 @@ namespace Volograms
             Close();
         }
 
+        /// <summary>
+        ///  
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
         public IEnumerator LoadAudio(string url)
         {
             using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG))
@@ -200,12 +241,13 @@ namespace Volograms
                 {
                     AudioClip clip = UnityEngine.Networking.DownloadHandlerAudioClip.GetContent(www);
                     _audioPlayerVols.clip = clip;
+                    Debug.Log("Audio Loaded");
                 }
                 else
                 {
                     Debug.LogError("Failed to load audio: " + www.error);
                 }
-            }           
+            }
         }
 
         /// <summary>
@@ -216,7 +258,54 @@ namespace Volograms
             StartCoroutine(OpenCoroutine(onComplete));
         }
 
-        
+        private bool StartOpenMode()
+        {
+            // Your existing Open logic
+            string headerFile = "";
+            _fullGeomPath = volFilePathType.ResolvePath(volFile);
+            bool geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, false);
+            Debug.Log("OpenMode: Opened vologram geometry from: " + _fullGeomPath + ", success: " + geomOpened);
+
+            return geomOpened;
+        }
+
+
+        /// <summary>
+        ///     
+        /// </summary>
+        /// <param name="onComplete"></param>
+        /// <returns></returns>
+        private IEnumerator StartStreamingMode(System.Action onComplete)
+        {
+            _isStreaming = true;
+            string streamURL = volFilePathType.ResolvePath(volFile);
+            bool headerOpened = false;
+
+            System.Action onHeaderOpen = () =>
+            {
+                Debug.Log("Streaming: Header opened.");
+                headerOpened = true;
+            };
+
+            if (streamingMode == VolEnums.StreamingMode.File)
+            {
+                string filename = Path.GetFileName(streamURL);
+                _fullGeomPath = Path.GetFullPath(Path.Combine(Application.temporaryCachePath, filename));
+                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToFile(streamURL, _fullGeomPath, onHeaderOpen));
+            }
+            else
+            {
+                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToBuffer(streamURL, onHeaderOpen));
+            }
+
+            yield return new WaitUntil(() => headerOpened); // Wait for the header to be opened
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="onComplete"></param>
+        /// <returns></returns>
         public IEnumerator OpenCoroutine(System.Action onComplete = null)
         {
             if (IsOpen)
@@ -234,6 +323,9 @@ namespace Volograms
             VolPluginInterface.EnableGeomLogging();
 
             bool geomOpened = false;
+
+            bool shouldStream = volFormat == VolEnums.VolFormat.BasisU &&
+                           volFilePathType == VolEnums.PathType.URL; // or URL
 
             if (VolEnums.VolFormat.Video == volFormat)
             {
@@ -294,10 +386,17 @@ namespace Volograms
             }
             else
             {
-                string headerFile = "";
-                _fullGeomPath = volFilePathType.ResolvePath(volFile);
-                geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, false);
-                Debug.Log("Opened vologram geometry from: " + _fullGeomPath + " and " + geomOpened);
+                Debug.Log("Opening vologram geometry from: " + volFilePathType.ResolvePath(volFile) +
+                          (shouldStream ? " with streaming." : "."));
+                if (shouldStream)
+                {
+                    yield return StartStreamingMode(onComplete);
+                    geomOpened = true;
+                }
+                else
+                {
+                    geomOpened = StartOpenMode();
+                }
 
                 if (geomOpened)
                 {
@@ -308,6 +407,7 @@ namespace Volograms
                     }
                     else
                     {
+                        Debug.Log("Basis Initialized: " + initBasis);
 #if UNITY_ANDROID
                         TextureFormat textureFormat = TextureFormat.ETC_RGB4;
                         //TextureFormat textureFormat = TextureFormat.ETC2_RGBA8;
@@ -337,6 +437,7 @@ namespace Volograms
                     }
                     if (audioOn && VolPluginInterface.VolHasAudio())
                     {
+                        Debug.Log("Loading Audio");
                         int audioSize;
                         IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
                         if (audioData != IntPtr.Zero && audioSize > 0)
@@ -751,9 +852,9 @@ namespace Volograms
         /// <summary>
         /// Read and process a frame's geometry data
         /// </summary>
-        private void ReadGeomFrame(int frame)
+        private bool ReadGeomFrame(int frame)
         {
-            if (frame >= _numFrames) { return; }
+            if (frame >= _numFrames) { return false; }
 
             bool isKeyframe = VolPluginInterface.VolGeomIsKeyframe(frame);
             string sequenceFile;
@@ -766,13 +867,13 @@ namespace Volograms
             if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
             {
                 Debug.LogError("Error loading geometry frame");
-                return;
+                return false;
             }
 
             _geometryData = VolPluginInterface.VolGeomGetPtrData();
 
             if (_geometryData.blockDataSize == 0)
-                return;
+                return false;
 
             // TODO(Anton) maybe can remove a memcopy here with a cast/pointer? 
             _meshData = new byte[_geometryData.blockDataSize];
@@ -853,6 +954,7 @@ namespace Volograms
 #endif
 
             nativeMeshData.Dispose();
+            return true;
         }
 
         /// <summary>
