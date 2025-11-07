@@ -5,66 +5,97 @@
 // <date>06/11/25</date>
 // <summary></summary>
 
-using UnityEngine;
 using System;
 using System.Collections;
-using UnityEngine.Networking;
 using System.IO;
+using UnityEditor.PackageManager.Requests;
+using UnityEngine;
+using UnityEngine.Networking;
 
 
 namespace Volograms
 {
     public static class VolStreamingHelper
     {
+        private static UnityWebRequest _activeDownloadRequest;
+        private static StreamingDownloadHandler _downloadHandler;
+
+        public static void Stop()
+        {
+            _downloadHandler?.Dispose();
+            _activeDownloadRequest?.Dispose();
+            _activeDownloadRequest = null;
+            _downloadHandler = null;
+
+        }
+
         public static IEnumerator StreamToFile(
             string sourceUrl,
             string destPath,
-            Action onHeaderOpen,
-            Action<float> onProgress = null
+            Action<bool> onHeaderOpen,
+            Action<float> onProgress = null,
+            Action<string> onError = null
             )
         {
-            using (var request = UnityWebRequest.Get(sourceUrl))
+            try
             {
-                request.downloadHandler = new StreamingDownloadHandler(destPath);
-                request.SendWebRequest();
-
-                bool isOpened = false;
-                string header = "";
-
-                while (!request.isDone)
+                using (_activeDownloadRequest = UnityWebRequest.Get(sourceUrl))
                 {
-                    float progress = request.downloadProgress;
-                    onProgress?.Invoke(progress);
-                    //Debug.Log("Download progress: " + progress);
+                    _downloadHandler = new StreamingDownloadHandler(destPath);
+                    _activeDownloadRequest.downloadHandler = _downloadHandler;
+                    _activeDownloadRequest.SendWebRequest();
 
-                    if (!isOpened && request.downloadedBytes > 1024*1024*4)
+                    bool isOpened = false;
+                    string header = "";
+
+                    while (!_activeDownloadRequest.isDone)
                     {
-                        // Open file 
-                        isOpened = VolPluginInterface.VolGeomOpenFile(header, destPath, false);
-                        if (isOpened)
-                        {
-                            Debug.Log("Streame opened: " + isOpened);
-                            onHeaderOpen?.Invoke();
-                        }
-                    }
-                    yield return null; // Continue next frame
-                }
+                        float progress = _activeDownloadRequest.downloadProgress;
+                        onProgress?.Invoke(progress);
+                        //Debug.Log("Download progress: " + progress);
 
-                // Final update
-                if (!isOpened)
-                {
-                    VolPluginInterface.VolGeomOpenFile(header, destPath, false);
-                    onHeaderOpen?.Invoke();
+                        if (!isOpened && _activeDownloadRequest.downloadedBytes > 1024 * 1024 * 4)
+                        {
+                            // Open file 
+                            isOpened = VolPluginInterface.VolGeomOpenFile(header, destPath, false);
+                            if (isOpened)
+                            {
+                                onHeaderOpen?.Invoke(isOpened);
+                            }
+                        }
+                        yield return null; // Continue next frame
+                    }
+                    bool error = false;
+                    if (_activeDownloadRequest.result != UnityWebRequest.Result.ConnectionError || _activeDownloadRequest.result != UnityWebRequest.Result.ProtocolError)
+                    {
+                        error = true;
+                        onError?.Invoke(_activeDownloadRequest.error);
+                    }
+
+                    // Final update
+                    if (!error && !isOpened)
+                    {
+                        isOpened = VolPluginInterface.VolGeomOpenFile(header, destPath, false);
+                        onHeaderOpen?.Invoke(isOpened);
+                    }
+                    Debug.Log("Download is done.");
                 }
-                Debug.Log("Download is done.");
-                //VolPluginInterface.VolGeomUpdateFramesDirectory(destPath, VolPluginInterface.VolGeomGetFrameCount()-1);
-                //onFramesAvailable?.Invoke(VolPluginInterface.VolGeomGetFrameCount());
+            }
+            finally
+            {
+                Stop();
             }
         }
 
-        public static IEnumerator StreamToBuffer(string sourceUrl, Action onHeaderOpen)
+        public static IEnumerator StreamToBuffer(
+            string sourceUrl, 
+            Action<bool> onHeaderOpen,
+            Action<float> onProgress = null,
+            Action<string> onError = null
+            )
         {
             // TODO: Implement circular buffer version
+            onError?.Invoke("Function not implemented");
             yield break;
         }
     }

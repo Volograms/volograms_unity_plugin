@@ -24,9 +24,6 @@ namespace Volograms
     public class VolPlayer : MonoBehaviour
     {
         [Header("Streaming Settings (Single-file format only)")]
-        [Tooltip("Enable streaming for large files. Only works with single .vols files.")]
-        public bool enableStreaming = true;
-
         [Tooltip("File: Stream to disk (mobile-friendly). Buffer: Stream to memory (faster seeking).")]
         public VolEnums.StreamingMode streamingMode = VolEnums.StreamingMode.File;
 
@@ -34,8 +31,8 @@ namespace Volograms
         private bool _isStreaming = false;
         private bool _isBuffering = false;
         private Coroutine _downloadCoroutine;
-        //private string _streamingFilePath;
-        private int _framesDownloaded = 0;
+
+        public float StreamingProgress { get; private set; } = 0f;
 
         [Header("Paths")]
         public VolEnums.PathType volFolderPathType;
@@ -121,12 +118,7 @@ namespace Volograms
                 }
             }
 
-            Open(onComplete: () => {
-                if (playOnStart)
-                {
-                    Play();
-                }
-            });
+            Open();
         }
 
         /// <summary>
@@ -134,6 +126,9 @@ namespace Volograms
         /// </summary>
         private void Update()
         {
+            if(!IsOpen || !IsPlaying)
+                return;
+
             if (IsPlaying && !_isBuffering)
             {
                 // Work out the frame index to play based on elapsed animation time. This lets us skip to the correct frame when the player is going slowly.
@@ -144,7 +139,7 @@ namespace Volograms
             // Not enough time has passed to advance to the next frame yet.
             if (desiredFrameIndex == _currentlyLoadedFrameIndex || desiredFrameIndex < 0) { return; }
 
-            Debug.Log("Desired Frame Index: " + desiredFrameIndex);
+            //Debug.Log("Desired Frame Index: " + desiredFrameIndex);
 
             if (desiredFrameIndex >= _numFrames)
             {
@@ -154,8 +149,7 @@ namespace Volograms
                 }
                 else
                 {
-                    IsPlaying = false;
-                    Close();
+                    Stop();
                 }
                 return;
             }
@@ -177,8 +171,6 @@ namespace Volograms
                     _isBuffering = false;
                 }
             }
-            //return;
-
 
             // --VIDEO TEXTURE--
             // Always skip video frames to desired frame.
@@ -253,60 +245,225 @@ namespace Volograms
         /// <summary>
         /// Public method to Open the given vologram files
         /// </summary>
-        public void Open(System.Action onComplete = null)
+        /// 
+        public void Open()
         {
-            StartCoroutine(OpenCoroutine(onComplete));
+            Open(
+                onComplete: () =>
+                {
+                    if (playOnStart)
+                    {
+                        Play();
+                    }
+                },
+                onProgress: progress =>
+                {
+                    StreamingProgress = progress;
+                }
+            );
         }
 
-        private bool StartOpenMode()
+        /// <summary>
+        ///  Private version of Open with callbacks
+        /// </summary>
+        /// <param name="onComplete"></param>
+        /// <param name="onProgress"></param>
+        private void Open(System.Action onComplete = null, System.Action<float> onProgress = null)
         {
-            // Your existing Open logic
-            string headerFile = "";
-            _fullGeomPath = volFilePathType.ResolvePath(volFile);
-            bool geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, false);
-            Debug.Log("OpenMode: Opened vologram geometry from: " + _fullGeomPath + ", success: " + geomOpened);
-
-            return geomOpened;
+            StartCoroutine(OpenCoroutine(onComplete, onProgress));
         }
 
+        //private bool StartOpenMode()
+        //{
+        //    // Your existing Open logic
+        //    string headerFile = "";
+        //    _fullGeomPath = volFilePathType.ResolvePath(volFile);
+        //    bool geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, false);
+        //    Debug.Log("OpenMode: Opened vologram geometry from: " + _fullGeomPath + ", success: " + geomOpened);
+
+        //    return geomOpened;
+        //}
 
         /// <summary>
         ///     
         /// </summary>
         /// <param name="onComplete"></param>
         /// <returns></returns>
-        private IEnumerator StartStreamingMode(System.Action onComplete)
+        private IEnumerator StartStreamingMode(System.Action onComplete, System.Action<float> onProgress = null, Action<string> onError = null)
         {
             _isStreaming = true;
             string streamURL = volFilePathType.ResolvePath(volFile);
             bool headerOpened = false;
 
-            System.Action onHeaderOpen = () =>
+            System.Action<bool> onHeaderOpen = isOpened =>
             {
-                Debug.Log("Streaming: Header opened.");
+                Debug.Log("Streaming: Header opened: " + isOpened);
                 headerOpened = true;
             };
 
             if (streamingMode == VolEnums.StreamingMode.File)
             {
                 string filename = Path.GetFileName(streamURL);
-                _fullGeomPath = Path.GetFullPath(Path.Combine(Application.temporaryCachePath, filename));
-                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToFile(streamURL, _fullGeomPath, onHeaderOpen));
+                _fullGeomPath = Path.GetFullPath(Path.GetFullPath(Path.Combine(Application.temporaryCachePath, filename)));
+                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToFile(streamURL, _fullGeomPath, onHeaderOpen, onProgress, onError));
             }
             else
             {
-                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToBuffer(streamURL, onHeaderOpen));
+                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToBuffer(streamURL, onHeaderOpen, onProgress, onError));
             }
 
             yield return new WaitUntil(() => headerOpened); // Wait for the header to be opened
         }
 
         /// <summary>
-        /// 
+        /// Open a video sequence vologram
+        /// </summary>
+        /// <param name="volVideoTexture"></param>
+        /// <param name="volFolder"></param>
+        /// <returns></returns>
+        private bool OpenVideoSequence(string volVideoTexture, string volFolder) 
+        {
+            bool geomOpened = false;
+            _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
+            _fullVideoPath = volVideoTexturePathType.ResolvePath(volVideoTexture);
+
+            if (_hasVideoTexture)
+            {
+                bool openedVideo = VolPluginInterface.VolOpenFile(_fullVideoPath);
+                Debug.Log("Opened vologram video texture from: " + _fullVideoPath + " and " + openedVideo);
+                if (openedVideo)
+                {
+                    // Audio
+                    if (audioOn)
+                    {
+                        _audioPlayerVideo.Stop();
+                        _audioPlayerVideo.sendFrameReadyEvents = true;
+                        _audioPlayerVideo.source = VideoSource.Url;
+                        _audioPlayerVideo.url = _fullVideoPath;
+
+                        _audioPlayerVideo.frameReady -= AudioVideoPlayerOnFrameReady;
+                        _audioPlayerVideo.frameReady += AudioVideoPlayerOnFrameReady;
+                        _audioPlayerVideo.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
+                        _audioPlayerVideo.loopPointReached += AudioVideoPlayerOnLoopPointReached;
+                        _audioPlayerVideo.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
+                        _audioPlayerVideo.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
+                        _audioPlayerVideo.errorReceived -= AudioVideoPlayerOnErrorReceived;
+                        _audioPlayerVideo.errorReceived += AudioVideoPlayerOnErrorReceived;
+
+                        _audioPlayerVideo.renderMode = VideoRenderMode.APIOnly;
+                        _audioPlayerVideo.audioOutputMode = VideoAudioOutputMode.Direct;
+                        _audioPlayerVideo.EnableAudioTrack(0, true);
+                        _audioPlayerVideo.SetDirectAudioVolume(0, 1f);
+                        _audioPlayerVideo.SetDirectAudioMute(0, false);
+                        _audioPlayerVideo.controlledAudioTrackCount = 1;
+                        _audioPlayerVideo.Prepare();
+                    }
+
+                    // Mesh
+                    _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
+                    string headerFile = Path.Combine(_fullGeomPath, "header.vols");
+                    string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+                    geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
+
+                    if (geomOpened)
+                    {
+                        int texWidth = VolPluginInterface.VolGetVideoWidth();
+                        int texHeight = VolPluginInterface.VolGetVideoHeight();
+
+                        // Texture
+                        _voloTexture = new Texture2D(
+                        texWidth,
+                        texHeight,
+                        TextureFormat.RGB24, false, false);
+                    }
+                }
+            }
+            return geomOpened;
+        }
+
+        /// <summary>
+        /// Open texture and audio for a single-file vologram    
+        /// </summary>
+        /// <param name="geomOpened"></param>
+        /// <returns></returns>
+        private IEnumerator OpenSingleFileSequence(bool geomOpened)
+        {
+            bool initBasis = VolPluginInterface.VolInitBasisDecoder();
+            if (!initBasis)
+            {
+                Debug.LogError("Failed to initialize Bassis texteure decoder.");
+            }
+            else
+            {
+                Debug.Log("Basis Initialized: " + initBasis);
+#if UNITY_ANDROID
+                        TextureFormat textureFormat = TextureFormat.ETC_RGB4;
+                        //TextureFormat textureFormat = TextureFormat.ETC2_RGBA8;
+#elif UNITY_IOS
+                        TextureFormat textureFormat = TextureFormat.ASTC_4x4;
+#else
+                TextureFormat textureFormat = TextureFormat.DXT1;
+#endif
+                try
+                {
+                    int texWidth = VolPluginInterface.VolGetTextureWidth();
+                    int texHeight = VolPluginInterface.VolGetTextureHeight();
+
+                    if (texHeight > 0 && texWidth > 0)
+                    {
+                        _voloTexture = new Texture2D(
+                            texWidth,
+                            texHeight,
+                            textureFormat, false, false, true); // TODO(Jan): Set the texture format based on the platform
+                    }
+                }
+                catch (Exception e)
+                {
+                    _voloTexture = null;
+                    Debug.LogError("Failed to create vologram texture. " + e.Message);
+                }
+            }
+            if (audioOn && VolPluginInterface.VolHasAudio())
+            {
+                Debug.Log("Loading Audio");
+                int audioSize;
+                IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
+                if (audioData != IntPtr.Zero && audioSize > 0)
+                {
+                    byte[] audioBytes = new byte[audioSize];
+                    Marshal.Copy(audioData, audioBytes, 0, audioSize);
+
+                    // temporary local path for audio file so we can load it via UnityWebRequest
+                    string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, System.Guid.NewGuid().ToString() + "-audio.mp3");
+                    bool fileExists = false;
+                    try
+                    {
+                        System.IO.File.WriteAllBytes(tempPath, audioBytes);
+                        fileExists = System.IO.File.Exists(tempPath);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError("Failed to write audio file to temp path: " + e.Message);
+                    }
+                    if (fileExists)
+                    {
+                        string uri = "file://" + tempPath;
+                        yield return LoadAudio(uri);
+
+                        // cleanup
+                        System.IO.File.Delete(tempPath);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// A coroutine to open the vologram files
         /// </summary>
         /// <param name="onComplete"></param>
+        /// <param name="onProgress"></param>
         /// <returns></returns>
-        public IEnumerator OpenCoroutine(System.Action onComplete = null)
+        public IEnumerator OpenCoroutine(System.Action onComplete = null, System.Action<float> onProgress = null)
         {
             if (IsOpen)
             {
@@ -324,151 +481,43 @@ namespace Volograms
 
             bool geomOpened = false;
 
-            bool shouldStream = volFormat == VolEnums.VolFormat.BasisU &&
-                           volFilePathType == VolEnums.PathType.URL; // or URL
-
             if (VolEnums.VolFormat.Video == volFormat)
             {
-                _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
-                _fullVideoPath = volVideoTexturePathType.ResolvePath(volVideoTexture);
-
-                if (_hasVideoTexture)
-                {
-                    bool openedVideo = VolPluginInterface.VolOpenFile(_fullVideoPath);
-                    Debug.Log("Opened vologram video texture from: " + _fullVideoPath + " and " + openedVideo);
-                    if (openedVideo)
-                    {
-                        // Audio
-                        if (audioOn)
-                        {
-                            _audioPlayerVideo.Stop();
-                            _audioPlayerVideo.sendFrameReadyEvents = true;
-                            _audioPlayerVideo.source = VideoSource.Url;
-                            _audioPlayerVideo.url = _fullVideoPath;
-
-                            _audioPlayerVideo.frameReady -= AudioVideoPlayerOnFrameReady;
-                            _audioPlayerVideo.frameReady += AudioVideoPlayerOnFrameReady;
-                            _audioPlayerVideo.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
-                            _audioPlayerVideo.loopPointReached += AudioVideoPlayerOnLoopPointReached;
-                            _audioPlayerVideo.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
-                            _audioPlayerVideo.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
-                            _audioPlayerVideo.errorReceived -= AudioVideoPlayerOnErrorReceived;
-                            _audioPlayerVideo.errorReceived += AudioVideoPlayerOnErrorReceived;
-
-                            _audioPlayerVideo.renderMode = VideoRenderMode.APIOnly;
-                            _audioPlayerVideo.audioOutputMode = VideoAudioOutputMode.Direct;
-                            _audioPlayerVideo.EnableAudioTrack(0, true);
-                            _audioPlayerVideo.SetDirectAudioVolume(0, 1f);
-                            _audioPlayerVideo.SetDirectAudioMute(0, false);
-                            _audioPlayerVideo.controlledAudioTrackCount = 1;
-                            _audioPlayerVideo.Prepare();
-                        }
-
-                        // Mesh
-                        _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
-                        string headerFile = Path.Combine(_fullGeomPath, "header.vols");
-                        string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-                        geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
-
-                        if (geomOpened)
-                        {
-                            int texWidth = VolPluginInterface.VolGetVideoWidth();
-                            int texHeight = VolPluginInterface.VolGetVideoHeight();
-
-                            // Texture
-                            _voloTexture = new Texture2D(
-                            texWidth,
-                            texHeight,
-                            TextureFormat.RGB24, false, false);
-                        }
-                    }
-                }
+                geomOpened = OpenVideoSequence(volVideoTexture, volFolder);
             }
-            else
+            else if (VolEnums.VolFormat.BasisU == volFormat)
             {
-                Debug.Log("Opening vologram geometry from: " + volFilePathType.ResolvePath(volFile) +
-                          (shouldStream ? " with streaming." : "."));
+                bool shouldStream = volFormat == VolEnums.VolFormat.BasisU && volFilePathType == VolEnums.PathType.URL;
+                Debug.Log("Opening vologram geometry from: " + volFilePathType.ResolvePath(volFile) + (shouldStream ? " with streaming." : "."));
+
                 if (shouldStream)
                 {
-                    yield return StartStreamingMode(onComplete);
-                    geomOpened = true;
+                    bool errorOccurred = false;
+
+                    System.Action<string> onError = errorMessage =>
+                    {
+                        Debug.LogError("Error during streaming: " + errorMessage);
+                        errorOccurred = true;
+                    };
+
+                    yield return StartStreamingMode(onComplete, onProgress, onError);
+                    if (!errorOccurred)
+                    {
+                        geomOpened = true;
+                    }
                 }
                 else
                 {
-                    geomOpened = StartOpenMode();
+                    _fullGeomPath = volFilePathType.ResolvePath(volFile);
+                    geomOpened = VolPluginInterface.VolGeomOpenFile("", _fullGeomPath, false);
                 }
 
                 if (geomOpened)
                 {
-                    bool initBasis = VolPluginInterface.VolInitBasisDecoder();
-                    if (!initBasis)
-                    {
-                        Debug.LogError("Failed to initialize Bassis texteure decoder.");
-                    }
-                    else
-                    {
-                        Debug.Log("Basis Initialized: " + initBasis);
-#if UNITY_ANDROID
-                        TextureFormat textureFormat = TextureFormat.ETC_RGB4;
-                        //TextureFormat textureFormat = TextureFormat.ETC2_RGBA8;
-#elif UNITY_IOS
-                        TextureFormat textureFormat = TextureFormat.ASTC_4x4;
-#else
-                        TextureFormat textureFormat = TextureFormat.DXT1;
-#endif
-                        try
-                        {
-                            int texWidth = VolPluginInterface.VolGetTextureWidth();
-                            int texHeight = VolPluginInterface.VolGetTextureHeight();
-
-                            if (texHeight > 0 && texWidth > 0)
-                            {
-                                _voloTexture = new Texture2D(
-                                    texWidth,
-                                    texHeight,
-                                    textureFormat, false, false, true); // TODO(Jan): Set the texture format based on the platform
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            _voloTexture = null;
-                            Debug.LogError("Failed to create vologram texture. " + e.Message);
-                        }
-                    }
-                    if (audioOn && VolPluginInterface.VolHasAudio())
-                    {
-                        Debug.Log("Loading Audio");
-                        int audioSize;
-                        IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
-                        if (audioData != IntPtr.Zero && audioSize > 0)
-                        {
-                            byte[] audioBytes = new byte[audioSize];
-                            Marshal.Copy(audioData, audioBytes, 0, audioSize);
-
-                            // temporary local path for audio file so we can load it via UnityWebRequest
-                            string tempPath = System.IO.Path.Combine(Application.temporaryCachePath, System.Guid.NewGuid().ToString() + "-audio.mp3");
-                            bool fileExists = false;
-                            try { 
-                                System.IO.File.WriteAllBytes(tempPath, audioBytes);
-                                fileExists = System.IO.File.Exists(tempPath);
-                            }
-                            catch (Exception e)
-                            {
-                                Debug.LogError("Failed to write audio file to temp path: " + e.Message);
-                            }
-                            if (fileExists)
-                            {
-                                string uri = "file://" + tempPath;
-                                yield return LoadAudio(uri);
-
-                                // cleanup
-                                System.IO.File.Delete(tempPath);
-                            }
-                        }
-                    }
+                    yield return OpenSingleFileSequence(geomOpened);
                 }
             }
-            Debug.Log("Vols file loaded: " + geomOpened);
+            
             if (!geomOpened)
             {
                 if (_hasVideoTexture)
@@ -544,21 +593,55 @@ namespace Volograms
         /// <returns>True if successful</returns>
         public bool Close()
         {
-            if (!IsOpen)
-                return false;
+            Stop();
 
-            if (audioOn)
+            IsOpen = false;
+
+            if (_isStreaming)
             {
-                if (_audioPlayerVideo != null) _audioPlayerVideo.Stop();
-                if (_audioPlayerVols != null) _audioPlayerVols.Stop();
+                // Stop streaming
+                VolStreamingHelper.Stop();
+
+                if (_downloadCoroutine != null)
+                {
+                    StopCoroutine(_downloadCoroutine);
+                    _downloadCoroutine = null;
+                }
             }
 
-            IsPlaying = false;
             bool closedVideo = true;
             if (_hasVideoTexture)
                 closedVideo = VolPluginInterface.VolCloseFile();
             bool freedGeom = VolPluginInterface.VolFreeGeomData();
-            IsOpen = false;
+
+            // Clean up temporary streaming file
+            if (_isStreaming)
+            {
+                bool deleteTempFile = volFormat == VolEnums.VolFormat.BasisU && volFilePathType == VolEnums.PathType.URL;
+                bool isTempFile = File.Exists(_fullGeomPath) && _fullGeomPath.StartsWith(Path.GetFullPath(Application.temporaryCachePath));
+                if (isTempFile && deleteTempFile)
+                {
+                    try
+                    {
+                        File.Delete(_fullGeomPath);
+                        Debug.Log("Deleted streaming temp file");
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"Could not delete streaming file: {e.Message}");
+                    }
+                }
+                _isStreaming = false;
+            }
+
+            // Remove mesh
+#if UNITY_EDITOR
+            if (_meshFilter.sharedMesh != null) 
+                _meshFilter.sharedMesh.Clear();
+#else
+            if(_meshFilter.mesh != null) 
+                _meshFilter.mesh.Clear();
+#endif
 
             VolPluginInterface.ClearLoggingFunctions();
 
@@ -594,6 +677,24 @@ namespace Volograms
             if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Pause();
         }
 
+        public void Stop()
+        {
+            if (!IsOpen)
+                return;
+
+            IsPlaying = false;
+            //IsOpen = false;
+
+            if (audioOn && _audioPlayerVideo != null) _audioPlayerVideo.Stop();
+            if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Stop();
+
+            //bool closedVideo = true;
+            //if (_hasVideoTexture)
+            //    closedVideo = VolPluginInterface.VolCloseFile();
+            //bool freedGeom = VolPluginInterface.VolFreeGeomData();
+        }
+
+
         /// <summary>
         /// Closes the vologram and re-opens it
         /// </summary>
@@ -603,9 +704,11 @@ namespace Volograms
             if (!IsOpen)
                 return false;
 
-            bool closed = Close();
-            if (!closed)
-                return false;
+            //bool closed = Close();
+            //if (!closed)
+            //    return false;
+
+            Stop();
 
             if (_hasVideoTexture)
             {
