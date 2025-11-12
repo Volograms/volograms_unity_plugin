@@ -25,14 +25,21 @@ namespace Volograms
     {
         [Header("Streaming Settings (Single-file format only)")]
         [Tooltip("File: Stream to disk (mobile-friendly). Buffer: Stream to memory (faster seeking).")]
-        public VolEnums.StreamingMode streamingMode = VolEnums.StreamingMode.File;
+        public VolEnums.StreamingMode streamingMode;
 
         // Private streaming state
         private bool _isStreaming = false;
         private bool _isBuffering = false;
         private Coroutine _downloadCoroutine;
 
+        [Header("Buffer Settings (Buffer Mode Only)")]
+        [Tooltip("Maximum buffer size in MB")]
+        public int maxBufferSizeMB = 200;
+        [Tooltip("Seconds of video to keep ahead")]
+        public float lookaheadSeconds = 2.0f;
+
         public float StreamingProgress { get; private set; } = 0f;
+        private VolStreamingSession _streamingSession;
 
         [Header("Paths")]
         public VolEnums.PathType volFolderPathType;
@@ -79,6 +86,7 @@ namespace Volograms
         private int _textureId;
         private VideoPlayer _audioPlayerVideo;
         private AudioSource _audioPlayerVols;
+        
 
         public bool IsOpen { get; private set; }
         public bool IsPlaying { get; private set; }
@@ -90,6 +98,9 @@ namespace Volograms
         /// </summary>
         private void Start()
         {
+            streamingMode = VolEnums.StreamingMode.Buffer;
+
+            //streamingMode = VolEnums.StreamingMode.Buffer;
 #if UNITY_EDITOR
             if (_meshFilter.sharedMesh == null)
             {
@@ -159,7 +170,11 @@ namespace Volograms
             bool isFrameAvailable = false;
             if (_isStreaming)
             {
-                isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, desiredFrameIndex);
+                if (streamingMode == VolEnums.StreamingMode.File)
+                    isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, desiredFrameIndex);
+                else // Buffer mode
+                    isFrameAvailable = VolPluginInterface.VolIsFrameAvailableInBuffer(desiredFrameIndex);
+
                 if (!isFrameAvailable)
                 {
                     // Still downloading - pause plauyback until we have enough data.
@@ -295,6 +310,15 @@ namespace Volograms
             string streamURL = volFilePathType.ResolvePath(volFile);
             bool headerOpened = false;
 
+            if (_streamingSession != null)
+            {
+                _streamingSession.Stop();
+            }
+            else
+            {
+                _streamingSession = new VolStreamingSession(this);
+            }
+
             System.Action<bool> onHeaderOpen = isOpened =>
             {
                 Debug.Log("Streaming: Header opened: " + isOpened);
@@ -305,11 +329,11 @@ namespace Volograms
             {
                 string filename = Path.GetFileName(streamURL);
                 _fullGeomPath = Path.GetFullPath(Path.GetFullPath(Path.Combine(Application.temporaryCachePath, filename)));
-                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToFile(streamURL, _fullGeomPath, onHeaderOpen, onProgress, onError));
+                _downloadCoroutine = StartCoroutine(_streamingSession.RunFileStreaming(streamURL, _fullGeomPath, onHeaderOpen, onProgress, onError));
             }
             else
             {
-                _downloadCoroutine = StartCoroutine(VolStreamingHelper.StreamToBuffer(streamURL, onHeaderOpen, onProgress, onError));
+                _downloadCoroutine = StartCoroutine(_streamingSession.RunBufferStreaming(streamURL, 0, -1, 8*1024*1024, isLooping, onHeaderOpen, onProgress, onError));
             }
 
             yield return new WaitUntil(() => headerOpened); // Wait for the header to be opened
@@ -600,7 +624,11 @@ namespace Volograms
             if (_isStreaming)
             {
                 // Stop streaming
-                VolStreamingHelper.Stop();
+                if (_streamingSession != null)
+                {
+                    _streamingSession.Stop();
+                    _streamingSession = null;
+                }
 
                 if (_downloadCoroutine != null)
                 {
@@ -960,17 +988,28 @@ namespace Volograms
             if (frame >= _numFrames) { return false; }
 
             bool isKeyframe = VolPluginInterface.VolGeomIsKeyframe(frame);
-            string sequenceFile;
-
-            if (volFormat == VolEnums.VolFormat.Video)
-                sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-            else
-                sequenceFile = _fullGeomPath;
-
-            if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
+            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer)
             {
-                Debug.LogError("Error loading geometry frame");
-                return false;
+                if (!VolPluginInterface.VolReadFrameStreaming(frame))
+                {
+                    Debug.LogError("Error loading geometry frame");
+                    return false;
+                }
+            }
+            else 
+            { 
+                string sequenceFile;
+
+                if (volFormat == VolEnums.VolFormat.Video)
+                    sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
+                else
+                    sequenceFile = _fullGeomPath;
+
+                if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
+                {
+                    Debug.LogError("Error loading geometry frame");
+                    return false;
+                }
             }
 
             _geometryData = VolPluginInterface.VolGeomGetPtrData();

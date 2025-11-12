@@ -770,28 +770,6 @@ bool vol_geom_update_frames_directory( const char* seq_filename, vol_geom_info_t
   //    return false;
   //}
 
-  //// Update maximum blob size and its allocation in the memory
-  //if(info_ptr->biggest_frame_blob_sz > biggest_frame_blob_sz ) {
-  //  _vol_loggerf( VOL_GEOM_LOG_TYPE_INFO, "Resizing frame blob from %" PRId64 " to %" PRId64 " bytes for frame %u\n", biggest_frame_blob_sz, info_ptr->biggest_frame_blob_sz, frame_idx );
-  //  if (info_ptr->preallocated_frame_blob_ptr) {
-  //      uint8_t* new_ptr = calloc(1, info_ptr->biggest_frame_blob_sz); // realloc(info_ptr->preallocated_frame_blob_ptr, info_ptr->biggest_frame_blob_sz);
-  //      if (!new_ptr) {
-  //          _vol_loggerf(VOL_GEOM_LOG_TYPE_INFO, "ERROR: out of memory allocating frame blob reserve.\n");
-  //          return false;
-  //      }
-  //      uint8_t* old_ptr = info_ptr->preallocated_frame_blob_ptr;
-  //      info_ptr->preallocated_frame_blob_ptr = new_ptr;
-  //    /*  free(old_ptr);
-  //      old_ptr = 0;*/
-  //  }
-  //  else {
-  //      info_ptr->preallocated_frame_blob_ptr = calloc(1, info_ptr->biggest_frame_blob_sz);
-  //      if (!info_ptr->preallocated_frame_blob_ptr) {
-  //          _vol_loggerf(VOL_GEOM_LOG_TYPE_INFO, "ERROR: out of memory allocating frame blob reserve.\n");
-  //          return false;
-  //      }
-  //  }
-  //}
 
   return true;
 }
@@ -825,6 +803,7 @@ bool vol_geom_read_frame( const char* seq_filename,  vol_geom_info_t* info_ptr, 
   }
 
   // Find frame section within sequence file blob if it was pre-loaded.
+  // TODO(Jan): check how this works with "streaming" mode
   if ( info_ptr->sequence_blob_byte_ptr ) {
     // Get the offset of that frame and size required to allocate for it.
     vol_geom_size_t offset_sz = info_ptr->frames_directory_ptr[frame_idx].offset_sz;

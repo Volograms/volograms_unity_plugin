@@ -157,6 +157,61 @@ namespace Volograms
         //[DllImport(DLL, EntryPoint = "get_texture_update_callback")]
         //private static extern System.IntPtr GetTextureUpdateCallback();
 
+
+        // Circular Buffer Streaming functions
+        // Streaming buffer configuration
+        [DllImport(DLL, EntryPoint = "native_vol_init_streaming_config")]
+        public static extern bool VolInitStreamingConfig();
+
+        [DllImport(DLL, EntryPoint = "native_vol_should_use_streaming_mode")]
+        public static extern bool VolShouldUseStreamingMode(long fileSize);
+
+        [DllImport(DLL, EntryPoint = "native_vol_create_streaming_buffer")]
+        public static extern bool VolCreateStreamingBuffer();
+
+        // Add data to buffer
+        [DllImport(DLL, EntryPoint = "native_vol_add_data_to_buffer")]
+        public static extern bool VolAddDataToBuffer(IntPtr dataPtr, long dataSize);
+
+        // Frame directory management
+        [DllImport(DLL, EntryPoint = "native_vol_update_buffer_frame_directory")]
+        public static extern bool VolUpdateBufferFrameDirectory();
+
+        // Frame reading
+        [DllImport(DLL, EntryPoint = "native_vol_read_frame_streaming")]
+        public static extern bool VolReadFrameStreaming(int frameIdx);
+
+        [DllImport(DLL, EntryPoint = "native_vol_is_frame_available_in_buffer")]
+        public static extern bool VolIsFrameAvailableInBuffer(int frameIdx);
+
+        // Buffer management
+        [DllImport(DLL, EntryPoint = "native_vol_update_buffer_state")]
+        public static extern bool VolUpdateBufferState();
+
+        [DllImport(DLL, EntryPoint = "native_vol_is_download_buffer_full")]
+        public static extern bool VolIsDownloadBufferFull();
+
+        [DllImport(DLL, EntryPoint = "native_vol_should_resume_download")]
+        public static extern bool VolShouldResumeDownload(int currentFrame, float fps);
+
+        // Buffer health monitoring
+        [DllImport(DLL, EntryPoint = "native_vol_get_buffer_health_seconds")]
+        public static extern float VolGetBufferHealthSeconds(float fps);
+
+        // Streaming file info creation (for buffer mode)
+        [DllImport(DLL, EntryPoint = "native_vol_create_streaming_file_info")]
+        public static extern bool VolCreateStreamingFileInfo();
+
+        // Configuration setters
+        [DllImport(DLL, EntryPoint = "native_vol_set_max_buffer_size")]
+        public static extern void VolSetMaxBufferSize(long bytes);
+
+        [DllImport(DLL, EntryPoint = "native_vol_set_lookahead_seconds")]
+        public static extern void VolSetLookaheadSeconds(float seconds);
+
+
+
+
         //private static CommandBuffer _commandBuffer;
 
         [MonoPInvokeCallback(typeof(DebugDelegate))]
