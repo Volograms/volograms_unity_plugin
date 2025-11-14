@@ -179,41 +179,64 @@ namespace Volograms
                 {
                     // Still downloading - pause plauyback until we have enough data.
                     Debug.LogWarning($"Buffering... waiting for frame {desiredFrameIndex}");
+                    BufferingPause();
                     _isBuffering = true;
+
                     return;
-                } else
+                } 
+                else
                 {
+                    if (_isBuffering)
+                    {
+                        Debug.Log("Resuming playback from buffering.");
+                        BufferingResume();
+                    }
                     _isBuffering = false;
                 }
             }
 
-            // --VIDEO TEXTURE--
-            // Always skip video frames to desired frame.
-            if (volFormat == VolEnums.VolFormat.Video)
+            if (!_isBuffering)
             {
-                ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
-            }
-             
-            // --GEOMETRY--
-            int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
-            bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
-            // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
-            // unless it is a keyframe itself.
-            bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
-            if (needToLoadKeyframe) { 
-                if(!ReadGeomFrame(previousKeyframeIndex)) return; 
-            }
-            if (!ReadGeomFrame(desiredFrameIndex)) return;
+                // --VIDEO TEXTURE--
+                // Always skip video frames to desired frame.
+                if (volFormat == VolEnums.VolFormat.Video)
+                {
+                    ReadVideoFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
+                }
 
-            // --BASISU TEXTURE--
-            if (volFormat == VolEnums.VolFormat.BasisU)
+                // --GEOMETRY--
+                int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
+                bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
+                // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
+                // unless it is a keyframe itself.
+                bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
+                if (needToLoadKeyframe)
+                {
+                    if (!ReadGeomFrame(previousKeyframeIndex)) return;
+                }
+                if (!ReadGeomFrame(desiredFrameIndex)) return;
+
+                // --BASISU TEXTURE--
+                if (volFormat == VolEnums.VolFormat.BasisU)
+                {
+                    // Swap the order - mesh first, texture next
+                    ReadTextureFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
+                }
+
+                // Advance frame
+                _currentlyLoadedFrameIndex = desiredFrameIndex;
+            }
+
+            // Update buffer streaming session
+            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer)
             {
-                // Swap the order - mesh first, texture next
-                ReadTextureFrame(_currentlyLoadedFrameIndex, desiredFrameIndex);
-            }
+                _streamingSession.SetLoopStreaming(isLooping);
 
-            // Advance frame
-            _currentlyLoadedFrameIndex = desiredFrameIndex;
+                double fps = 1.0 / _secondsPerFrame;
+                if(VolPluginInterface.VolShouldResumeDownload(_currentlyLoadedFrameIndex, (float) fps))
+                    _streamingSession.ResumeDownload();
+
+            }
         }
 
         /// <summary>
@@ -333,7 +356,7 @@ namespace Volograms
             }
             else
             {
-                _downloadCoroutine = StartCoroutine(_streamingSession.RunBufferStreaming(streamURL, 0, -1, 8*1024*1024, isLooping, onHeaderOpen, onProgress, onError));
+                _downloadCoroutine = StartCoroutine(_streamingSession.RunBufferStreaming(streamURL, isLooping, onHeaderOpen, onProgress, onError));
             }
 
             yield return new WaitUntil(() => headerOpened); // Wait for the header to be opened
@@ -676,6 +699,23 @@ namespace Volograms
             return closedVideo && freedGeom;
         }
 
+        private void BufferingPause()
+        {
+            if (!IsOpen || !IsPlaying)
+                return;
+
+            // Pause playback during buffering
+            if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Pause();
+        }
+
+        private void BufferingResume()
+        {
+            if (!IsOpen || !IsPlaying)
+                return;
+
+            if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Play();
+        }
+
         /// <summary>
         /// Play the vologram
         /// </summary>
@@ -747,31 +787,15 @@ namespace Volograms
                     return false;
                 }
             }
-            bool geomOpened;
-            if (volFormat == VolEnums.VolFormat.Video)
-            {
-                string headerFile = Path.Combine(_fullGeomPath, "header.vols");
-                string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-                geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
-            }
-            else
-            {
-                string headerFile = "";
-                geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, true);
-            }
 
-            if (!geomOpened)
-            {
-                if (_hasVideoTexture)
-                    VolPluginInterface.VolCloseFile();
-                IsOpen = false;
-                return false;
-            }
+            // Handle a special case where we need a first frame after a restart and it is not in the buffer anymore.
+            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer)
+                _streamingSession.RestartFromStart();
 
             _currentlyLoadedFrameIndex = -1;
             _animationAccumulatedSeconds = 0f;
 
-            IsOpen = true;
+            //IsOpen = true;
             if (playOnStart)
                 Play();
             return true;
@@ -997,7 +1021,7 @@ namespace Volograms
                 }
             }
             else 
-            { 
+            {
                 string sequenceFile;
 
                 if (volFormat == VolEnums.VolFormat.Video)

@@ -46,7 +46,7 @@ typedef struct vol_geom_file_record_t {
   vol_geom_size_t sz; // Size of file in bytes.
 } vol_geom_file_record_t;
 
-static vol_geom_log_type_t _log_level = VOL_GEOM_LOG_TYPE_DEBUG;
+static vol_geom_log_type_t _log_level = VOL_GEOM_LOG_TYPE_INFO;
 
 static void _default_logger( vol_geom_log_type_t log_type, const char* message_str ) {
   FILE* stream_ptr = ( VOL_GEOM_LOG_TYPE_ERROR == log_type || VOL_GEOM_LOG_TYPE_WARNING == log_type ) ? stderr : stdout;
@@ -1227,6 +1227,9 @@ bool vol_geom_update_buffer_frame_directory( vol_geom_info_t* info_ptr ) {
 
 // Ring copy helper (C99) used by streaming parser to read across wrap
 static bool _ring_copy_bytes( const vol_geom_buffer_state_t* buffer_state, vol_geom_size_t logical_offset, uint8_t* dst_ptr, vol_geom_size_t bytes_to_copy ) {
+
+  _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "RING Copy: sequence_offset: buffer_state=%" PRId64 ", logical_offset=%" PRId64 ", dst_ptr=%" PRId64 ", bytes_to_copy=%" PRId64 " \n", buffer_state, logical_offset, dst_ptr, bytes_to_copy);
+
   if ( !buffer_state || !buffer_state->ring_buffer || !dst_ptr || bytes_to_copy <= 0 ) { return false; }
   if ( logical_offset + bytes_to_copy > buffer_state->data_size ) { return false; }
   vol_geom_size_t physical_offset = ( buffer_state->head_offset + logical_offset ) % buffer_state->ring_capacity;
@@ -1255,6 +1258,7 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
   if ( info_ptr->hdr.frame_count == 0 && info_ptr->sequence_offset == 0 && buffer_data_size > VOL_GEOM_FILE_HDR_V10_MIN_SZ ) {
     vol_geom_size_t hdr_sz = 0;
     vol_geom_file_hdr_t temp_hdr;
+    _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Parsing buffer %s: Parsing Header \n", buffer_name);
     
     if ( vol_geom_read_hdr_from_mem( buffer_to_parse, (uint32_t)buffer_data_size, &temp_hdr, &hdr_sz ) ) {
       info_ptr->hdr = temp_hdr;
@@ -1309,7 +1313,8 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
       return false;
     }
   }
-  
+   
+  _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Parsing buffer %s: sequence_offset: %" PRId64 " \n", buffer_name, info_ptr->sequence_offset);
   if ( info_ptr->sequence_offset == 0 ) {
     return false; // Header not ready yet
   }
@@ -1557,17 +1562,14 @@ bool vol_geom_update_buffer_state( vol_geom_info_t* info_ptr ) {
   // Determine the earliest frame we must keep: the keyframe for the current playback frame
   uint32_t keep_from_frame = 0;
   if ( buffer_state->last_playback_frame < info_ptr->hdr.frame_count ) {
-    uint32_t lpf = buffer_state->last_playback_frame;
+	// We don't need to keep the keyframe, the frame is already loaded.
+    keep_from_frame = buffer_state->last_playback_frame;
+    /*uint32_t lpf = buffer_state->last_playback_frame;
     int32_t kf = info_ptr->frame_headers_ptr[lpf].keyframe_number;
-    if ( kf >= 0 ) { keep_from_frame = (uint32_t)kf; }
+    if ( kf >= 0 ) { keep_from_frame = (uint32_t)kf; }*/
   }
+  _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Keep from last_playback_frame=%u\n", buffer_state->last_playback_frame);
   
-  // If keyframe is frame 0, there is simply nothing to evict before it
-  if ( keep_from_frame == 0 ) {
-    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Nothing to evict: keyframe is 0 for last_playback_frame=%u\n", buffer_state->last_playback_frame );
-    return false;
-  }
-
   // Find the last valid frame strictly before the keyframe we need to keep
   // Anchor-based boundary: keep current playback frame and everything after it.
   vol_geom_size_t boundary_offset = -1;
@@ -1593,6 +1595,12 @@ bool vol_geom_update_buffer_state( vol_geom_info_t* info_ptr ) {
       buffer_state->last_playback_frame = 0;
       return true;
     }
+  }
+
+  // If keyframe is frame 0, there is simply nothing to evict before it
+  if (keep_from_frame == 0) {
+      _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Nothing to evict: keyframe is 0 for last_playback_frame=%u\n", buffer_state->last_playback_frame);
+      return false;
   }
 
   _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "COMPACT_DEBUG: anchor_frame=%u, boundary_offset=%" PRId64 ", head_offset=%" PRId64 "\n", 

@@ -209,6 +209,15 @@ namespace Volograms
         [DllImport(DLL, EntryPoint = "native_vol_set_lookahead_seconds")]
         public static extern void VolSetLookaheadSeconds(float seconds);
 
+        [DllImport(DLL, EntryPoint = "native_vol_get_header_frame_body_start")]
+        public static extern int VolGetFrameBodyStart();
+
+        [DllImport(DLL, EntryPoint = "native_vol_reset_frame_directory")]
+        public static extern void VolResetFrameDirectory();
+
+        [DllImport(DLL, EntryPoint = "native_vol_get_playback_buffer_size")]
+        public static extern int VolGetUsedBufferSize();
+
 
 
 

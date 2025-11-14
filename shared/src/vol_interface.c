@@ -598,21 +598,32 @@ DllExport bool native_vol_is_download_buffer_full() {
 }
 
 DllExport bool native_vol_should_resume_download(uint32_t current_frame, float fps) {
-    vol_geom_info_t g_info = native_vol_get_geom_info();
-    return vol_geom_should_resume_download(&g_info, current_frame, fps);
+    return vol_geom_should_resume_download(&geom_file_ptr, current_frame, fps);
 }
 
 DllExport float native_vol_get_buffer_health_seconds(float fps) {
     vol_geom_info_t g_info = native_vol_get_geom_info();
-    return vol_geom_get_buffer_health_seconds(&g_info, fps);
+    return vol_geom_get_buffer_health_seconds(&geom_file_ptr, fps);
 }
+
 
 DllExport bool native_vol_create_streaming_file_info() {
     return vol_geom_create_streaming_file_info(&geom_file_ptr);
 }
 
+DllExport int native_vol_get_header_frame_body_start(void) {
+    return vol_geom_get_sequence_offset(&geom_file_ptr);
+}
 
+DllExport void native_vol_reset_frame_directory(void) {
+    return vol_geom_reset_frame_directory(&geom_file_ptr);
+}
 
+DllExport int native_vol_get_playback_buffer_size(void) {
+    vol_geom_size_t buffer_size = 0;
+    const uint8_t* buffer = vol_geom_get_playback_buffer(&geom_file_ptr, &buffer_size);
+    return buffer ? (int)buffer_size : 0;
+}
 
 
 #if __cplusplus
