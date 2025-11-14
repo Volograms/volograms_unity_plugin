@@ -140,10 +140,11 @@ namespace Volograms
             if(!IsOpen || !IsPlaying)
                 return;
 
+            double deltaTime = Time.deltaTime;
             if (IsPlaying && !_isBuffering)
             {
                 // Work out the frame index to play based on elapsed animation time. This lets us skip to the correct frame when the player is going slowly.
-                _animationAccumulatedSeconds += Time.deltaTime;
+                _animationAccumulatedSeconds += deltaTime;
             }
 
             int desiredFrameIndex = (int)(_animationAccumulatedSeconds / _secondsPerFrame);
@@ -170,7 +171,19 @@ namespace Volograms
             bool isFrameAvailable = false;
             if (_isStreaming)
             {
-                if (streamingMode == VolEnums.StreamingMode.File)
+                if (_isBuffering)
+                {
+                    float RESUME_BUFFER_SECONDS = 2.0f;
+                    double fps = 1.0 / _secondsPerFrame;
+
+                    float bufferHealthSeconds = VolPluginInterface.VolGetBufferHealthSeconds((float)fps);
+                    if (bufferHealthSeconds < RESUME_BUFFER_SECONDS)
+                    {
+                        return;
+                    }
+                }
+
+                    if (streamingMode == VolEnums.StreamingMode.File)
                     isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, desiredFrameIndex);
                 else // Buffer mode
                     isFrameAvailable = VolPluginInterface.VolIsFrameAvailableInBuffer(desiredFrameIndex);
