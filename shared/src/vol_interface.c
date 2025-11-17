@@ -256,6 +256,16 @@ DllExport uint8_t* native_vol_get_audio(int* outSize)
     return vol_info.audio_data_ptr;
 }
 
+/** Update missing items in frames directory initially created by vol_geom_create_file_info_from_file.
+ @param seq_filename    Path to the sequence file
+ @param frame           Index of the frame you want to update
+ @returns               If the operation was a success
+ */
+DllExport bool native_vol_update_frames_directory(const char* seq_filename, int frame) {
+    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    return vol_geom_update_frames_directory(seq_filename, &vol_info, frame);
+}
+
 /**
  * Basis Texture from Vols File
  */
@@ -518,6 +528,103 @@ UnityRenderingEventAndData UNITY_INTERFACE_API get_texture_update_callback(void)
 }
 
 #endif
+
+/**
+ * Circular Streaming Buffer
+ */
+
+static vol_geom_streaming_config_t g_streaming_config;
+
+// Configuration
+DllExport bool native_vol_init_streaming_config() {
+    return vol_geom_init_streaming_config(&g_streaming_config);
+}
+
+DllExport bool native_vol_should_use_streaming_mode(int64_t file_size) {
+    return vol_geom_should_use_streaming_mode(file_size, &g_streaming_config);
+}
+
+DllExport void native_vol_set_max_buffer_size(int64_t bytes) {
+    g_streaming_config.max_buffer_size = bytes;
+}
+
+DllExport void native_vol_set_lookahead_seconds(float seconds) {
+    g_streaming_config.lookahead_seconds = seconds;
+}
+
+DllExport bool native_vol_create_streaming_buffer() {
+    
+    memset(&geom_file_ptr, 0, sizeof(vol_geom_info_t));
+    
+    return vol_geom_create_streaming_buffer(&geom_file_ptr, &g_streaming_config);
+
+    memset(&geom_frame_data, 0, sizeof(vol_geom_frame_data_t));
+}
+
+// Add data
+DllExport bool native_vol_add_data_to_buffer(const uint8_t* data_ptr, int64_t data_size) {
+	// pass in directly geom_file_ptr as we are changing it. 
+    return vol_geom_add_data_to_buffer(&geom_file_ptr, data_ptr, data_size);
+}
+
+// Frame directory
+DllExport bool native_vol_update_buffer_frame_directory() {
+    return vol_geom_update_buffer_frame_directory(&geom_file_ptr);
+}
+
+// Frame reading
+DllExport bool native_vol_read_frame_streaming(uint32_t frame_idx) {
+    
+    if (frame_idx >= (int32_t)geom_file_ptr.hdr.frame_count)
+        return false;
+
+    bool ret = vol_geom_read_frame_streaming(&geom_file_ptr, frame_idx, &geom_frame_data);
+    return ret;
+}
+
+DllExport bool native_vol_is_frame_available_in_buffer(uint32_t frame_idx) {
+    vol_geom_info_t g_info = native_vol_get_geom_info();
+    return vol_geom_is_frame_available_in_buffer(&g_info, frame_idx);
+}
+
+// Buffer management
+DllExport bool native_vol_update_buffer_state() {
+    return vol_geom_update_buffer_state(&geom_file_ptr);
+}
+
+DllExport bool native_vol_is_download_buffer_full() {
+    vol_geom_info_t g_info = native_vol_get_geom_info();
+    return vol_geom_is_download_buffer_full(&g_info);
+}
+
+DllExport bool native_vol_should_resume_download(uint32_t current_frame, float fps) {
+    return vol_geom_should_resume_download(&geom_file_ptr, current_frame, fps);
+}
+
+DllExport float native_vol_get_buffer_health_seconds(float fps) {
+    vol_geom_info_t g_info = native_vol_get_geom_info();
+    return vol_geom_get_buffer_health_seconds(&geom_file_ptr, fps);
+}
+
+
+DllExport bool native_vol_create_streaming_file_info() {
+    return vol_geom_create_streaming_file_info(&geom_file_ptr);
+}
+
+DllExport int native_vol_get_header_frame_body_start(void) {
+    return vol_geom_get_sequence_offset(&geom_file_ptr);
+}
+
+DllExport void native_vol_reset_frame_directory(void) {
+    return vol_geom_reset_frame_directory(&geom_file_ptr);
+}
+
+DllExport int native_vol_get_playback_buffer_size(void) {
+    vol_geom_size_t buffer_size = 0;
+    const uint8_t* buffer = vol_geom_get_playback_buffer(&geom_file_ptr, &buffer_size);
+    return buffer ? (int)buffer_size : 0;
+}
+
 
 #if __cplusplus
 }

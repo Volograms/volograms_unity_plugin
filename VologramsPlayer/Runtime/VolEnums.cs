@@ -26,6 +26,18 @@ namespace Volograms
             BasisU  //  All data (mesh + texture) in a single file 
         }
 
+        public enum StreamingMode 
+        {
+            /// <summary>
+            /// All data is downloaded into a file on disk
+            /// </summary>
+            File,
+            /// <summary>
+            /// Data is downloaded in chunks as needed during playback into a memory buffer
+            /// </summary>
+            Buffer
+        }
+
         /// <summary>
         /// Enums referring to the different paths made available through Unity
         /// Enables cross-platform paths
@@ -35,8 +47,9 @@ namespace Volograms
         {
             Absolute,   // = string.Empty
             Persistent, // = Application.persistentDataPath
-            Streaming,  // = Application.streamingAssetsPath
-            Data        // = Application.dataPath
+            Assets,  // = Application.streamingAssetsPath
+            Data,       // = Application.dataPath
+            URL         // = for web requests
         }
 
 
@@ -52,7 +65,7 @@ namespace Volograms
             {
                 case PathType.Persistent:
                     return Path.Combine(Application.persistentDataPath, path);
-                case PathType.Streaming:
+                case PathType.Assets:
                     return Path.Combine(Application.streamingAssetsPath, path);
                 case PathType.Data:
                     return Path.Combine(Application.dataPath, path);
@@ -73,7 +86,7 @@ namespace Volograms
             {
                 case PathType.Persistent:
                     return Application.persistentDataPath;
-                case PathType.Streaming:
+                case PathType.Assets:
                     return Application.streamingAssetsPath;
                 case PathType.Data:
                     return Application.dataPath;
@@ -95,9 +108,9 @@ namespace Volograms
                 return PathType.Persistent;
             }
 
-            if (fullPath.StartsWith(PathType.Streaming.ToPath()))
+            if (fullPath.StartsWith(PathType.Assets.ToPath()))
             {
-                return PathType.Streaming;
+                return PathType.Assets;
             }
 
             if (fullPath.StartsWith(PathType.Data.ToPath()))

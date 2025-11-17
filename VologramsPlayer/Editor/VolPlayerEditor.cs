@@ -5,6 +5,7 @@
 // <date>18/02/22</date>
 // <summary>Custom inspector for the VolPlayer component</summary>
 
+using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -17,8 +18,8 @@ namespace Volograms
         private VolPlayer _target;
         private bool _showPathHelp;
         private bool _debugFoldout;
-        private bool _pathsFoldout;
-        private bool _playbackFoldout;
+        private bool _pathsFoldout = true;
+        private bool _playbackFoldout = true;
         private bool _renderingFoldout;
 
         private const string OpenVolFolderFileCacheId = "VolPlayer_Editor_VolFolderFileOpenCache";
@@ -143,26 +144,37 @@ Geom: Enables logging of geometry-related native code"
             _target.volFile = EditorGUILayout.TextField(_target.volFile, EditorStyles.textField);
             EditorGUI.indentLevel--;
 
-            if (GUILayout.Button("Open New Vols File"))
+            if (_target.volFilePathType != VolEnums.PathType.URL)
             {
-                string cached = PlayerPrefs.GetString(OpenVolsFileCacheId, _target.volFilePathType.ResolvePath(_target.volFile));
-                string openedFile = EditorUtility.OpenFilePanelWithFilters("Open Vols File", cached, _openVolsFileFilters);
-                if (!string.IsNullOrEmpty(openedFile))
+                if (GUILayout.Button("Open New Vols File"))
                 {
-                    VolEnums.PathType selectedPathType = VolEnums.DeterminePathType(openedFile);
-                    string selectedPath = selectedPathType == VolEnums.PathType.Absolute
-                        ? openedFile
-                        : openedFile.Remove(0, selectedPathType.ToPath().Length + 1);
-                    _target.volFilePathType = selectedPathType;
-                    _target.volFile = selectedPath;
-                    PlayerPrefs.SetString(OpenVolsFileCacheId, Path.GetDirectoryName(openedFile) ?? string.Empty);
-                    EditorUtility.SetDirty(target);
+                    string cached = PlayerPrefs.GetString(OpenVolsFileCacheId, _target.volFilePathType.ResolvePath(_target.volFile));
+                    string openedFile = EditorUtility.OpenFilePanelWithFilters("Open Vols File", cached, _openVolsFileFilters);
+                    if (!string.IsNullOrEmpty(openedFile))
+                    {
+                        VolEnums.PathType selectedPathType = VolEnums.DeterminePathType(openedFile);
+                        string selectedPath = selectedPathType == VolEnums.PathType.Absolute
+                            ? openedFile
+                            : openedFile.Remove(0, selectedPathType.ToPath().Length + 1);
+                        _target.volFilePathType = selectedPathType;
+                        _target.volFile = selectedPath;
+                        PlayerPrefs.SetString(OpenVolsFileCacheId, Path.GetDirectoryName(openedFile) ?? string.Empty);
+                        EditorUtility.SetDirty(target);
+                    }
+                }
+
+                if (GUILayout.Button("Reveal Vols File in Finder"))
+                {
+                    EditorUtility.RevealInFinder(_target.volFilePathType.ResolvePath(_target.volFile));
                 }
             }
-
-            if (GUILayout.Button("Reveal Vols File in Finder"))
+            else
             {
-                EditorUtility.RevealInFinder(_target.volFilePathType.ResolvePath(_target.volFile));
+# if UNITY_STANDALONE_WIN
+                _target.bufferSizeMB = (int) EditorGUILayout.Slider("Buffer size (MB)", _target.bufferSizeMB, 50, 200);
+# else
+                EditorGUILayout.HelpBox("Streaming mode is not supported on this platform.", MessageType.Warning);
+# endif
             }
             EditorGUI.indentLevel--;
         }
