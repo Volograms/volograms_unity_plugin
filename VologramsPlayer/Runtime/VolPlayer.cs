@@ -33,10 +33,10 @@ namespace Volograms
         private Coroutine _downloadCoroutine;
 
         [Header("Buffer Settings (Buffer Mode Only)")]
-        [Tooltip("Maximum buffer size in MB")]
-        public int maxBufferSizeMB = 200;
+        [Tooltip("Buffer size in MB")]
+        public int bufferSizeMB = 50;
         [Tooltip("Seconds of video to keep ahead")]
-        public float lookaheadSeconds = 2.0f;
+        public float bufferAheadSeconds = 2.0f;
 
         public float StreamingProgress { get; private set; } = 0f;
         private VolStreamingSession _streamingSession;
@@ -173,17 +173,15 @@ namespace Volograms
             {
                 if (_isBuffering)
                 {
-                    float RESUME_BUFFER_SECONDS = 2.0f;
                     double fps = 1.0 / _secondsPerFrame;
-
                     float bufferHealthSeconds = VolPluginInterface.VolGetBufferHealthSeconds((float)fps);
-                    if (bufferHealthSeconds < RESUME_BUFFER_SECONDS)
+                    if (bufferHealthSeconds < bufferAheadSeconds)
                     {
                         return;
                     }
                 }
 
-                    if (streamingMode == VolEnums.StreamingMode.File)
+                if (streamingMode == VolEnums.StreamingMode.File)
                     isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, desiredFrameIndex);
                 else // Buffer mode
                     isFrameAvailable = VolPluginInterface.VolIsFrameAvailableInBuffer(desiredFrameIndex);
@@ -191,7 +189,7 @@ namespace Volograms
                 if (!isFrameAvailable)
                 {
                     // Still downloading - pause plauyback until we have enough data.
-                    Debug.LogWarning($"Buffering... waiting for frame {desiredFrameIndex}");
+                    Debug.Log($"Buffering... waiting for frame {desiredFrameIndex}");
                     BufferingPause();
                     _isBuffering = true;
 
@@ -201,7 +199,7 @@ namespace Volograms
                 {
                     if (_isBuffering)
                     {
-                        Debug.Log("Resuming playback from buffering.");
+                        Debug.Log("Resuming playback after buffering.");
                         BufferingResume();
                     }
                     _isBuffering = false;
@@ -284,7 +282,7 @@ namespace Volograms
                 {
                     AudioClip clip = UnityEngine.Networking.DownloadHandlerAudioClip.GetContent(www);
                     _audioPlayerVols.clip = clip;
-                    Debug.Log("Audio Loaded");
+                    //Debug.Log("Audio Loaded");
                 }
                 else
                 {
@@ -357,7 +355,7 @@ namespace Volograms
 
             System.Action<bool> onHeaderOpen = isOpened =>
             {
-                Debug.Log("Streaming: Header opened: " + isOpened);
+                //Debug.Log("Streaming: Header opened: " + isOpened);
                 headerOpened = true;
             };
 
@@ -369,7 +367,7 @@ namespace Volograms
             }
             else
             {
-                _downloadCoroutine = StartCoroutine(_streamingSession.RunBufferStreaming(streamURL, isLooping, onHeaderOpen, onProgress, onError));
+                _downloadCoroutine = StartCoroutine(_streamingSession.RunBufferStreaming(streamURL, isLooping, onHeaderOpen, onProgress, onError, bufferSizeMB));
             }
 
             yield return new WaitUntil(() => headerOpened); // Wait for the header to be opened
@@ -455,7 +453,7 @@ namespace Volograms
             }
             else
             {
-                Debug.Log("Basis Initialized: " + initBasis);
+                //Debug.Log("Basis Initialized: " + initBasis);
 #if UNITY_ANDROID
                         TextureFormat textureFormat = TextureFormat.ETC_RGB4;
                         //TextureFormat textureFormat = TextureFormat.ETC2_RGBA8;
@@ -485,7 +483,7 @@ namespace Volograms
             }
             if (audioOn && VolPluginInterface.VolHasAudio())
             {
-                Debug.Log("Loading Audio");
+                //Debug.Log("Loading Audio");
                 int audioSize;
                 IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
                 if (audioData != IntPtr.Zero && audioSize > 0)

@@ -146,7 +146,7 @@ public sealed class VolStreamingSession
         //_bodyStart = 0;
         long maxSize = bufferSize * 1024 * 1024;
         _fileSize = -1;           // pass -1 if unknown
-        _windowBytes = 8 * 1024 * 1024;
+        _windowBytes = 4 * 1024 * 1024;
         _loop = loop;
         _pos = 0;
         _stopped = false;
