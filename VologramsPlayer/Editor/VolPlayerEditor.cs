@@ -170,8 +170,11 @@ Geom: Enables logging of geometry-related native code"
             }
             else
             {
+# if UNITY_STANDALONE_WIN
                 _target.bufferSizeMB = (int) EditorGUILayout.Slider("Buffer size (MB)", _target.bufferSizeMB, 50, 200);
-
+# else
+                EditorGUILayout.HelpBox("Streaming mode is not supported on this platform.", MessageType.Warning);
+# endif
             }
             EditorGUI.indentLevel--;
         }
