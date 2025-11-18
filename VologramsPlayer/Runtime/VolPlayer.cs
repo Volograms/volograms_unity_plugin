@@ -30,6 +30,8 @@ namespace Volograms
         // Private streaming state
         private bool _isStreaming = false;
         private bool _isBuffering = false;
+        // _isSeek is used when playOnStart is not set to show frame 0 mesh on open or restart
+        private bool _isSeek = false;
         private Coroutine _downloadCoroutine;
 
         [Header("Buffer Settings (Buffer Mode Only)")]
@@ -86,7 +88,7 @@ namespace Volograms
         private int _textureId;
         private VideoPlayer _audioPlayerVideo;
         private AudioSource _audioPlayerVols;
-        
+
 
         public bool IsOpen { get; private set; }
         public bool IsPlaying { get; private set; }
@@ -113,9 +115,9 @@ namespace Volograms
         }
 #endif
 
-//#if UNITY_ANDROID
-//        //audioOn = true;
-//#endif
+            //#if UNITY_ANDROID
+            //        //audioOn = true;
+            //#endif
 
             //if (audioOn)
             {
@@ -137,9 +139,11 @@ namespace Volograms
         /// </summary>
         private void Update()
         {
-            if(!IsOpen || !IsPlaying)
-                return;
-
+            if (!_isSeek)
+            {
+                if (!IsOpen || !IsPlaying)
+                    return;
+            }
             double deltaTime = Time.deltaTime;
             if (IsPlaying && !_isBuffering)
             {
@@ -153,11 +157,13 @@ namespace Volograms
 
             //Debug.Log("Desired Frame Index: " + desiredFrameIndex);
 
-            if (desiredFrameIndex >= _numFrames)
+            if (!_isSeek && desiredFrameIndex >= _numFrames)
             {
                 if (isLooping)
                 {
+                    // Restart triggers play only if playOnStart is TRUE, we need to call Play() here
                     Restart();
+                    Play();
                 }
                 else
                 {
@@ -165,7 +171,6 @@ namespace Volograms
                 }
                 return;
             }
-
 
             // Streaming-aware frame check
             bool isFrameAvailable = false;
@@ -194,7 +199,7 @@ namespace Volograms
                     _isBuffering = true;
 
                     return;
-                } 
+                }
                 else
                 {
                     if (_isBuffering)
@@ -244,10 +249,11 @@ namespace Volograms
                 _streamingSession.SetLoopStreaming(isLooping);
 
                 double fps = 1.0 / _secondsPerFrame;
-                if(VolPluginInterface.VolShouldResumeDownload(_currentlyLoadedFrameIndex, (float) fps))
+                if (VolPluginInterface.VolShouldResumeDownload(_currentlyLoadedFrameIndex, (float)fps))
                     _streamingSession.ResumeDownload();
 
             }
+            _isSeek = false;
         }
 
         /// <summary>
@@ -301,9 +307,10 @@ namespace Volograms
                 onComplete: () =>
                 {
                     if (playOnStart)
-                    {
                         Play();
-                    }
+                    else
+                        // To load first frame, otherwise it wil not show the mesh
+                        _isSeek = true;
                 },
                 onProgress: progress =>
                 {
@@ -379,7 +386,7 @@ namespace Volograms
         /// <param name="volVideoTexture"></param>
         /// <param name="volFolder"></param>
         /// <returns></returns>
-        private bool OpenVideoSequence(string volVideoTexture, string volFolder) 
+        private bool OpenVideoSequence(string volVideoTexture, string volFolder)
         {
             bool geomOpened = false;
             _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
@@ -575,7 +582,7 @@ namespace Volograms
                     yield return OpenSingleFileSequence(geomOpened);
                 }
             }
-            
+
             if (!geomOpened)
             {
                 if (_hasVideoTexture)
@@ -698,7 +705,7 @@ namespace Volograms
 
             // Remove mesh
 #if UNITY_EDITOR
-            if (_meshFilter.sharedMesh != null) 
+            if (_meshFilter.sharedMesh != null)
                 _meshFilter.sharedMesh.Clear();
 #else
             if(_meshFilter.mesh != null) 
@@ -783,10 +790,6 @@ namespace Volograms
             if (!IsOpen)
                 return false;
 
-            //bool closed = Close();
-            //if (!closed)
-            //    return false;
-
             Stop();
 
             if (_hasVideoTexture)
@@ -806,9 +809,12 @@ namespace Volograms
             _currentlyLoadedFrameIndex = -1;
             _animationAccumulatedSeconds = 0f;
 
-            //IsOpen = true;
+            // For looping we call play in the Update() function
             if (playOnStart)
                 Play();
+            else
+                _isSeek = true;
+            
             return true;
         }
 
