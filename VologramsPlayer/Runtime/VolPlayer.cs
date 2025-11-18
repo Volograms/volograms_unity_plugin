@@ -100,8 +100,6 @@ namespace Volograms
         /// </summary>
         private void Start()
         {
-            streamingMode = VolEnums.StreamingMode.Buffer;
-
             //streamingMode = VolEnums.StreamingMode.Buffer;
 #if UNITY_EDITOR
             if (_meshFilter.sharedMesh == null)

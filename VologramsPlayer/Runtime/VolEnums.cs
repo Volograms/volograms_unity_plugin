@@ -29,13 +29,13 @@ namespace Volograms
         public enum StreamingMode 
         {
             /// <summary>
-            /// All data is downloaded into a file on disk
-            /// </summary>
-            File,
-            /// <summary>
             /// Data is downloaded in chunks as needed during playback into a memory buffer
             /// </summary>
-            Buffer
+            Buffer,
+            /// <summary>
+            /// All data is downloaded into a file on disk
+            /// </summary>
+            File
         }
 
         /// <summary>
