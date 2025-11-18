@@ -1,9 +1,10 @@
 # Volograms Unity Player 
-Version 1.1.1
+Version 1.1.2
 
 ## Supported Platforms 
+* Windows (win64)
 * MacOS
-* Windows (Win64)
+* iOS (arm64)
 * Android
 
 

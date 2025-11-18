@@ -5,8 +5,8 @@ This is the [Volograms](https://www.volograms.com/) SDK for Unity, in the form o
 ## Supported Platforms 
 
 * MacOS
-* iOS
-* Windows
+* iOS (arm64)
+* Windows (win64)
 * Android
 
 
