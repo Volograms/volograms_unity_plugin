@@ -2,6 +2,10 @@ Volograms Unity SDK Release Notes
 
 Check the README in the for information on the VolPlayer component and FAQs
 
+**v1.1.2** (18-11-25)
+* Add support for streaming volograms in buffer mode: MacOS, iOS, and Android.
+* Streaming mode selectable from Editor.
+
 **v1.1.1** (18-11-25)
 * Fix issue with looping when playOnStart is false.
 * Fix issue with Restart() and Open() when playOnStart is false. It shows first frame but then stops.

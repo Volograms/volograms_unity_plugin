@@ -1,10 +1,12 @@
 # Volograms Unity Player 
-Version 1.0.2
+Version 1.1.2
 
 ## Supported Platforms 
+* Windows (win64)
 * MacOS
-* Windows 
+* iOS (arm64)
 * Android
+
 
 ## `Vol Player` Component Inspector
 
@@ -63,6 +65,16 @@ The following properties can also be accessed from the `VolPlayer` component, e.
 | --- | --- | --- | 
 | `IsOpen` | Bool | Returns True if a set of files is open, False otherwise |
 | `IsPlaying` | Bool | Returns True if the vologram is playing, False otherwise |
+
+## Streaming Mode
+
+* `Stream to Buffer`: Stream the vologram to a small memory buffer (50MB by default). This is the default mode.
+* `Stream to File`: Stream the vologram to a file on disk. This saves the whole vologram and is re-used for looped playback.
+
+### Buffer Settings
+
+* `Buffer Size (MB)`: The size of the memory buffer in MB. The minimum size is 50MB.
+* `Lookahead Seconds`: The number of seconds of video to keep ahead in the buffer. The default is 2 seconds.
 
 ## Notes on Materials and Shaders
 

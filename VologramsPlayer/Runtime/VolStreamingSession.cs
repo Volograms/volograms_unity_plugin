@@ -48,7 +48,8 @@ public sealed class VolStreamingSession
         // Abort download
         if (IsRunning)
         {
-            _active?.Abort();
+            if(!_stopped)
+                _active?.Abort();
             _active?.Dispose();
         }
         // Dispose handler and close file
@@ -62,7 +63,7 @@ public sealed class VolStreamingSession
     public void SetLoopStreaming(bool enable) { _loop = enable; }
     public void RestartFromStart() 
     { 
-        _seekLocation = VolPluginInterface.VolGetFrameBodyStart(); 
+        _seekLocation = VolPluginInterface.VolGetFrameBodyStart();
         _seeking = true; 
         _paused = false; 
     }
