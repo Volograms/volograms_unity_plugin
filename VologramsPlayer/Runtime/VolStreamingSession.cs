@@ -180,7 +180,7 @@ public sealed class VolStreamingSession
 
             // Initialize your streaming buffer and config in the native plugin.
             VolPluginInterface.VolInitStreamingConfig();
-            VolPluginInterface.VolSetMaxBufferSize(maxSize);
+            VolPluginInterface.VolSetMaxBufferSize(Math.Min(Math.Max(5*1024*1024, _fileSize), maxSize));
             VolPluginInterface.VolSetLookaheadSeconds(lookaheadSeconds);
             if (!VolPluginInterface.VolCreateStreamingBuffer())
             {

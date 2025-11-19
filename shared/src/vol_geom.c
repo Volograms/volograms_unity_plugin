@@ -46,7 +46,7 @@ typedef struct vol_geom_file_record_t {
   vol_geom_size_t sz; // Size of file in bytes.
 } vol_geom_file_record_t;
 
-static vol_geom_log_type_t _log_level = VOL_GEOM_LOG_TYPE_INFO;
+static vol_geom_log_type_t _log_level = VOL_GEOM_LOG_TYPE_DEBUG;
 
 static void _default_logger( vol_geom_log_type_t log_type, const char* message_str ) {
   FILE* stream_ptr = ( VOL_GEOM_LOG_TYPE_ERROR == log_type || VOL_GEOM_LOG_TYPE_WARNING == log_type ) ? stderr : stdout;
@@ -931,7 +931,7 @@ bool vol_geom_init_streaming_config( vol_geom_streaming_config_t* config_ptr ) {
 
   // Set default values based on our design specifications
   config_ptr->max_buffer_size = 200 * 1024 * 1024;  // 200MB default
-  config_ptr->min_buffer_size = 50 * 1024 * 1024;   // 50MB minimum  
+  config_ptr->min_buffer_size = 5 * 1024 * 1024;   // 1MB minimum
   config_ptr->reserved_space_size = 10 * 1024 * 1024; // 10MB for first frame and keyframes
   config_ptr->auto_select_mode = true;               // Auto-select by default
   config_ptr->force_streaming_mode = false;          // Don't force by default
@@ -980,58 +980,6 @@ bool vol_geom_should_use_streaming_mode( vol_geom_size_t file_size, const vol_ge
 
   return use_streaming;
 }
-
-// bool vol_geom_parse_frame_header_from_buffer( const uint8_t* buffer_ptr, vol_geom_size_t offset, vol_geom_frame_hdr_t* header_ptr, vol_geom_size_t* header_size_ptr ) {
-//   if ( !buffer_ptr || !header_ptr || !header_size_ptr ) {
-//     _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: vol_geom_parse_frame_header_from_buffer() - NULL pointer(s).\n" );
-//     return false;
-//   }
-
-//   // Calculate the size of a frame header - this matches the existing vol_geom_frame_hdr_t structure
-//   const vol_geom_size_t frame_header_size = sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint8_t);
-//   *header_size_ptr = frame_header_size;
-
-//   // Parse the frame header from the buffer at the specified offset
-//   const uint8_t* read_ptr = buffer_ptr + offset;
-
-//   // Read frame_number (4 bytes, little-endian)
-//   header_ptr->frame_number = *((uint32_t*)read_ptr);
-//   read_ptr += sizeof(uint32_t);
-
-//   // Read mesh_data_sz (4 bytes, little-endian) 
-//   header_ptr->mesh_data_sz = *((uint32_t*)read_ptr);
-//   read_ptr += sizeof(uint32_t);
-
-//   // // Read keyframe_number (4 bytes, little-endian)
-//   header_ptr->keyframe_number = 0;  
-//   // read_ptr += sizeof(uint32_t);
-
-//   // Read keyframe type (1 byte)
-//   header_ptr->keyframe = *read_ptr;
-
-//   // Validate the parsed header
-//   if ( header_ptr->mesh_data_sz == 0 ) {
-//     _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Parsed frame %u has mesh_data_sz of 0.\n", header_ptr->frame_number );
-//     return false;
-//   }
-
-//   if ( header_ptr->mesh_data_sz > 100 * 1024 * 1024 ) { // Sanity check: 100MB max per frame
-//     _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Parsed frame %u has unrealistic mesh_data_sz of %u bytes.\n", 
-//       header_ptr->frame_number, header_ptr->mesh_data_sz );
-//     return false;
-//   }
-
-//   if ( header_ptr->keyframe > 2 ) { // Valid keyframe values are 0, 1, 2
-//     _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Parsed frame %u has invalid keyframe type %u.\n", 
-//       header_ptr->frame_number, header_ptr->keyframe );
-//     return false;
-//   }
-
-//   _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Parsed frame header: frame=%u, mesh_size=%u, keyframe_type=%u\n",
-//     header_ptr->frame_number, header_ptr->mesh_data_sz, header_ptr->keyframe );
-
-//   return true;
-// }
 
 bool vol_geom_create_streaming_buffer( vol_geom_info_t* info_ptr, const vol_geom_streaming_config_t* config_ptr ) {
   if ( !info_ptr || !config_ptr ) {
@@ -1255,7 +1203,7 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
   
   _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Parsing buffer %s: data_size=%" PRId64 "\n", buffer_name, buffer_data_size );
   
-  // If we don't have the main header yet, try to parse it (only once)
+  // Parse main header (only once)
   if ( info_ptr->hdr.frame_count == 0 && info_ptr->sequence_offset == 0 && buffer_data_size > VOL_GEOM_FILE_HDR_V10_MIN_SZ ) {
     vol_geom_size_t hdr_sz = 0;
     vol_geom_file_hdr_t temp_hdr;
@@ -1283,42 +1231,58 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
           return false;
         }
       }
-      if ( info_ptr->hdr.audio ) {
-        if(info_ptr->hdr.version < 13 ) {
-          _vol_loggerf( VOL_GEOM_LOG_TYPE_WARNING, "Audio is not supported in this version of the vols format. Disabling audio.\n", info_ptr->hdr.version );
-          info_ptr->hdr.audio = 0;
-        } else {
-          // Read the size of the audio data
-          uint32_t audio_data_sz = 0;
-          memcpy( &audio_data_sz, buffer_to_parse + info_ptr->hdr.audio_start, sizeof( uint32_t ) );
-          info_ptr->audio_data_sz = audio_data_sz;
-          _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Setting audio data size to %u\n", info_ptr->audio_data_sz );
-          // Read the audio data
-          info_ptr->audio_data_ptr = malloc( info_ptr->audio_data_sz );
-          if ( !info_ptr->audio_data_ptr ) {
-            _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: OOM allocating audio data. Disabling audio.\n");
-            info_ptr->hdr.audio = 0;
-            return false;
-          }
-          // Check the loaded buffer size before reading the audio data
-          // TODO: this is not ideal, if the audio is larger we should check later again to read it after we have buffered it fully.
-          if (info_ptr->hdr.audio_start + sizeof(uint32_t) + info_ptr->audio_data_sz <= buffer_data_size) {
-            memcpy( info_ptr->audio_data_ptr, buffer_to_parse + info_ptr->hdr.audio_start + sizeof( uint32_t ), info_ptr->audio_data_sz );
-            _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Copied audio from buffer.\n" );
-          }
-        }
-      }
+      
       buffer_state->parse_pos = info_ptr->sequence_offset;
+      _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Main header parsed.\n");
     } else {
       _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Main header not yet complete in buffer %s.\n", buffer_name );
       return false;
     }
   }
-  
-  if ( info_ptr->sequence_offset == 0 ) {
-    return false; // Header not ready yet
+
+  // Load Audio (only once)
+  _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Checking audio: is on: %d, size: %d .\n", info_ptr->hdr.audio, info_ptr->audio_data_sz);
+  if (info_ptr->hdr.audio && info_ptr->audio_data_sz == 0) {
+      if (info_ptr->hdr.version < 13) {
+          _vol_loggerf(VOL_GEOM_LOG_TYPE_WARNING, "Audio is not supported in this version of the vols format. Disabling audio.\n", info_ptr->hdr.version);
+          info_ptr->hdr.audio = 0;
+      }
+      else {
+          // Read the size of the audio data
+          uint32_t audio_data_sz = 0;
+          memcpy(&audio_data_sz, buffer_to_parse + info_ptr->hdr.audio_start, sizeof(uint32_t));
+
+          // The flag is wrong, set audio to false
+          if(audio_data_sz == 0) 
+              info_ptr->hdr.audio = 0;
+
+          // We are missing the whole audio, wait until we have it all.
+          if (info_ptr->hdr.audio_start + audio_data_sz > buffer_data_size) {
+              _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Audio data not donwloaded yet -- buffer size: %d, audio_start: %d, audio_data_sz: %d .\n", buffer_data_size, info_ptr->hdr.audio_start, audio_data_sz);
+              return false;
+          }
+          info_ptr->audio_data_sz = audio_data_sz;
+          _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Setting audio data size to %u\n", info_ptr->audio_data_sz);
+          // Read the audio data
+          info_ptr->audio_data_ptr = malloc(info_ptr->audio_data_sz);
+          if (!info_ptr->audio_data_ptr) {
+              _vol_loggerf(VOL_GEOM_LOG_TYPE_ERROR, "ERROR: OOM allocating audio data. Disabling audio.\n");
+              info_ptr->hdr.audio = 0;
+              return false;
+          }
+          // Check the loaded buffer size before reading the audio data
+          // TODO: this is not ideal, if the audio is larger we should check later again to read it after we have buffered it fully.
+          if (info_ptr->hdr.audio_start + sizeof(uint32_t) + info_ptr->audio_data_sz <= buffer_data_size) {
+              memcpy(info_ptr->audio_data_ptr, buffer_to_parse + info_ptr->hdr.audio_start + sizeof(uint32_t), info_ptr->audio_data_sz);
+              _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Copied audio from buffer.\n");
+          }
+      }
   }
-  
+
+  if (info_ptr->sequence_offset == 0 || info_ptr->frame_headers_ptr == NULL) {
+      return false; // Header not ready yet
+  }
+
   // Simple linear frame parsing over the appended region (logical positions from head)
   vol_geom_size_t parse_pos = buffer_state->parse_pos;
   uint32_t new_frames_found = 0;
@@ -1350,7 +1314,7 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
         frame_header.frame_number, frame_header.mesh_data_sz, frame_header.keyframe );
       break;
     }
-    
+
     // Set keyframe_number (matches logic from _build_frame_directory_from_file)
     if ( frame_header.keyframe == 1 || frame_header.keyframe == 2 ) {
       frame_header.keyframe_number = frame_header.frame_number;
@@ -1520,8 +1484,8 @@ bool vol_geom_read_frame_streaming( vol_geom_info_t* info_ptr, uint32_t frame_id
 }
 
 //
-// ===== DUAL BUFFER MANAGEMENT FUNCTIONS =====
-// Core functions for managing the dual buffer streaming system
+// ===== CIRCULAR BUFFER MANAGEMENT FUNCTIONS =====
+// Core functions for managing the buffer streaming system
 //
 
 bool vol_geom_is_download_buffer_full( const vol_geom_info_t* info_ptr ) {
@@ -1560,16 +1524,16 @@ bool vol_geom_update_buffer_state( vol_geom_info_t* info_ptr ) {
   }
 
   // Determine the earliest frame we must keep: the keyframe for the current playback frame
-  uint32_t keep_from_frame = 0;
-  if ( buffer_state->last_playback_frame < info_ptr->hdr.frame_count ) {
-	// We don't need to keep the keyframe, the frame is already loaded.
-    keep_from_frame = buffer_state->last_playback_frame;
-    /*uint32_t lpf = buffer_state->last_playback_frame;
-    int32_t kf = info_ptr->frame_headers_ptr[lpf].keyframe_number;
-    if ( kf >= 0 ) { keep_from_frame = (uint32_t)kf; }*/
-  }
+  uint32_t keep_from_frame = buffer_state->last_playback_frame;
+ // if ( buffer_state->last_playback_frame < info_ptr->hdr.frame_count ) {
+	//// We don't need to keep the keyframe, the frame is already loaded.
+ //   keep_from_frame = buffer_state->last_playback_frame;
+ //   /*uint32_t lpf = buffer_state->last_playback_frame;
+ //   int32_t kf = info_ptr->frame_headers_ptr[lpf].keyframe_number;
+ //   if ( kf >= 0 ) { keep_from_frame = (uint32_t)kf; }*/
+ // }
   
-  // Find the last valid frame strictly before the keyframe we need to keep
+  // Find the last valid frame strictly before the frame we need to keep
   // Anchor-based boundary: keep current playback frame and everything after it.
   vol_geom_size_t boundary_offset = -1;
   uint32_t lpf = buffer_state->last_playback_frame;
@@ -1585,7 +1549,7 @@ bool vol_geom_update_buffer_state( vol_geom_info_t* info_ptr ) {
     }
     if ( boundary_offset < 0 ) {
       // Clear buffer when there are no frames available, used in restart 
-      _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "COMPACT_DEBUG: no anchor available (lpf=%u); clearing buffer.\n", lpf );
+      _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "COMPACT_DEBUG: ✅ no anchor available (lpf=%u, frame_count=%u, boundary_offset=%d, total_sz=%d); clearing buffer.\n", lpf, info_ptr->hdr.frame_count, boundary_offset, info_ptr->frames_directory_ptr[lpf].total_sz);
       buffer_state->head_offset = 0;
       buffer_state->head_file_pos = 0;
       buffer_state->file_pos = 0;
@@ -1596,11 +1560,11 @@ bool vol_geom_update_buffer_state( vol_geom_info_t* info_ptr ) {
     }
   }
 
-  // If keyframe is frame 0, there is simply nothing to evict before it
-  if (keep_from_frame == 0) {
-      _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Nothing to evict: keyframe is 0 for last_playback_frame=%u\n", buffer_state->last_playback_frame);
-      return false;
-  }
+  //// If keyframe is frame 0, there is simply nothing to evict before it
+  //if (keep_from_frame == 0) {
+  //    _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Nothing to evict: keyframe is 0 for last_playback_frame=%u\n", buffer_state->last_playback_frame);
+  //    return false;
+  //}
 
   _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "COMPACT_DEBUG: anchor_frame=%u, boundary_offset=%" PRId64 ", head_offset=%" PRId64 "\n", 
     lpf, boundary_offset, buffer_state->head_offset );
