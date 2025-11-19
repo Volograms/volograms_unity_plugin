@@ -173,7 +173,7 @@ Geom: Enables logging of geometry-related native code"
 // # if UNITY_STANDALONE_WIN
                 _target.streamingMode = (VolEnums.StreamingMode)EditorGUILayout.EnumPopup("Streaming Mode:", _target.streamingMode, EditorStyles.popup);
                 if(_target.streamingMode == VolEnums.StreamingMode.Buffer)
-                    _target.bufferSizeMB = (int) EditorGUILayout.Slider("Buffer size (MB)", _target.bufferSizeMB, 50, 200);
+                    _target.bufferSizeMB = (int) EditorGUILayout.Slider("Buffer size (MB)", _target.bufferSizeMB, 60, 200);
 // # else
 //                 EditorGUILayout.HelpBox("Streaming mode is not supported on this platform.", MessageType.Warning);
 // # endif

@@ -140,7 +140,7 @@ public sealed class VolStreamingSession
         Action<bool> onHeaderOpen,
         Action<float> onProgress = null,
         Action<string> onError = null,
-        long bufferSize = 50, // in MB
+        long bufferSize = 60, // in MB
         float lookaheadSeconds = 2.0f // in seconds
         )
     {
@@ -264,18 +264,6 @@ public sealed class VolStreamingSession
                     while (!op.isDone)
                     {
                         if (_stopped || _seeking) { _active.Abort(); break; }
-
-                        // Buffer backpressure from native side
-                        //if (VolPluginInterface.VolIsDownloadBufferFull())
-                        //{
-                        //    _paused = true;
-                        //    yield return new WaitForSeconds(0.5f);
-                        //    continue;
-                        //}
-                        //if (_paused && VolPluginInterface.VolShouldResumeDownload(0, 30f))
-                        //{
-                        //    _paused = false;
-                        //}
 
                         // Progress (per window)
                         onProgress?.Invoke(_active.downloadProgress);
