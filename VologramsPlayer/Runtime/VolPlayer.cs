@@ -817,7 +817,7 @@ namespace Volograms
             }
 
             // Handle a special case where we need a first frame after a restart and it is not in the buffer anymore.
-            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer && VolPluginInterface.VolIsFrameAvailableInBuffer(0))
+            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer && !VolPluginInterface.VolIsFrameAvailableInBuffer(0))
                 _streamingSession.RestartFromStart();
 
             _currentlyLoadedFrameIndex = -1;
