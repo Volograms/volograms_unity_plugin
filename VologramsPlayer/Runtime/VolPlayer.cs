@@ -162,7 +162,7 @@ namespace Volograms
             if (!isFrameAvailable)
             {
                 // Still downloading - pause plauyback until we have enough data.
-                Debug.Log($"Buffering... waiting for frame {desiredFrameIndex}");
+                //Debug.Log($"Buffering... waiting for frame {desiredFrameIndex}");
                 BufferingPause();
                 _isBuffering = true;
 
@@ -172,7 +172,7 @@ namespace Volograms
             {
                 if (_isBuffering)
                 {
-                    Debug.Log("Resuming playback after buffering.");
+                    //Debug.Log("Resuming playback after buffering.");
                     BufferingResume();
                 }
                 _isBuffering = false;

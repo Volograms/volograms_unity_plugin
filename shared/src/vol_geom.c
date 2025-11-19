@@ -1309,6 +1309,12 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
         (unsigned)header_buf[0], (unsigned)header_buf[1], (unsigned)header_buf[2], (unsigned)header_buf[3],
         (unsigned)header_buf[4], (unsigned)header_buf[5], (unsigned)header_buf[6], (unsigned)header_buf[7], (unsigned)header_buf[8] );
     }
+
+    if (info_ptr->frame_headers_ptr[frame_header.frame_number].mesh_data_sz > 0) {
+        _vol_loggerf(VOL_GEOM_LOG_TYPE_WARNING, "WARNING: Parsed frame %u is already in buffer, this might be a second occurance. Wait until the previous version is used.\n", frame_header.frame_number);
+        break;
+    }
+
     if ( frame_header.mesh_data_sz == 0 || frame_header.keyframe > 2 || frame_header.mesh_data_sz > 100 * 1024 * 1024 ) {
       _vol_loggerf( VOL_GEOM_LOG_TYPE_ERROR, "ERROR: Parsed frame %u has invalid header: mesh=%u key=%u\n",
         frame_header.frame_number, frame_header.mesh_data_sz, frame_header.keyframe );
@@ -1328,17 +1334,10 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
         frame_header.keyframe_number = 0; // First frame case
       }
     }
-    _vol_loggerf( VOL_GEOM_LOG_TYPE_DEBUG, "Parsed frame header: frame=%u, mesh_size=%u, keyframe_type=%u, keyframe_number=%u\n", 
-      frame_header.frame_number, frame_header.mesh_data_sz, frame_header.keyframe, frame_header.keyframe_number );
-
-    // Persist header info immediately so eviction/keyframe queries are accurate even if frame body not complete yet
-    {
-      uint32_t fnum_hdr = frame_header.frame_number;
-      if ( fnum_hdr < info_ptr->hdr.frame_count && info_ptr->frame_headers_ptr ) {
-        info_ptr->frame_headers_ptr[fnum_hdr] = frame_header;
-      }
-    }
     
+    
+
+
     // Calculate total frame size
     vol_geom_size_t corrected_payload_sz = frame_header.mesh_data_sz;
     if ( info_ptr->hdr.version < 12 ) {
@@ -1360,6 +1359,11 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
         parse_pos, total_frame_size, buffer_data_size );
       break; // Incomplete frame
     }
+
+    _vol_loggerf(VOL_GEOM_LOG_TYPE_DEBUG, "Parsed frame header: frame=%u, mesh_size=%u, keyframe_type=%u, keyframe_number=%u\n",
+        frame_header.frame_number, frame_header.mesh_data_sz, frame_header.keyframe, frame_header.keyframe_number);
+
+
 
     // Validate trailing size sentinel matches mesh_data_sz to avoid drift
     uint32_t trailing_sz = 0;
@@ -1383,6 +1387,15 @@ bool vol_geom_update_single_buffer_frames( vol_geom_info_t* info_ptr, uint8_t* b
         parse_pos, ( buffer_state->head_offset + parse_pos ) % buffer_state->ring_capacity,
         trailing_sz, logical_tail_pos, physical_tail_pos );
       break;
+    }
+
+
+    // Persist header info immediately so eviction/keyframe queries are accurate even if frame body not complete yet
+    {
+        uint32_t fnum_hdr = frame_header.frame_number;
+        if (fnum_hdr < info_ptr->hdr.frame_count && info_ptr->frame_headers_ptr) {
+            info_ptr->frame_headers_ptr[fnum_hdr] = frame_header;
+        }
     }
     
     // Write directly into standard arrays for streaming mode; treat offset_sz as ring offset.

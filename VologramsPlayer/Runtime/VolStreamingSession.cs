@@ -48,8 +48,8 @@ public sealed class VolStreamingSession
         // Abort download
         if (IsRunning)
         {
-            if(!_stopped)
-                _active?.Abort();
+            //if(!_stopped)
+            //    _active?.Abort();
             _active?.Dispose();
         }
         // Dispose handler and close file
@@ -65,7 +65,7 @@ public sealed class VolStreamingSession
     { 
         _seekLocation = VolPluginInterface.VolGetFrameBodyStart();
         _seeking = true; 
-        _paused = false; 
+        _paused = false;
     }
 
     // FILE MODE: single GET streamed into a local file using your StreamingDownloadHandler.
@@ -145,9 +145,9 @@ public sealed class VolStreamingSession
         )
     {
         //_bodyStart = 0;
-        long maxSize = bufferSize * 1024 * 1024;
+        long bufferSizeBytes = bufferSize * 1024 * 1024;
         _fileSize = -1;           // pass -1 if unknown
-        _windowBytes = 4 * 1024 * 1024;
+        _windowBytes = 16 * 1024 * 1024;
         _loop = loop;
         _pos = 0;
         _stopped = false;
@@ -179,8 +179,9 @@ public sealed class VolStreamingSession
 
 
             // Initialize your streaming buffer and config in the native plugin.
+            bufferSizeBytes = Math.Min(Math.Max(5 * 1024 * 1024, _fileSize + safetyBufferHeadroom + 1), bufferSizeBytes);
             VolPluginInterface.VolInitStreamingConfig();
-            VolPluginInterface.VolSetMaxBufferSize(Math.Min(Math.Max(5*1024*1024, _fileSize), maxSize));
+            VolPluginInterface.VolSetMaxBufferSize(bufferSizeBytes);
             VolPluginInterface.VolSetLookaheadSeconds(lookaheadSeconds);
             if (!VolPluginInterface.VolCreateStreamingBuffer())
             {
@@ -201,40 +202,23 @@ public sealed class VolStreamingSession
                     _pos = _seekLocation;
 
                     // Order is important: reset frame directory first, then update buffer state.
+                    if(_fileSize > bufferSizeBytes) {
                     VolPluginInterface.VolResetFrameDirectory();
                     VolPluginInterface.VolUpdateBufferState();
+                    }
                     _seeking = false;
                 }
 
-                // Check buffer space or wait for enough free space in buffer
-                long usedSize = VolPluginInterface.VolGetUsedBufferSize();
-                long freeSpace = maxSize - usedSize;
-
-                if (_paused || freeSpace < (_windowBytes + safetyBufferHeadroom))
-                {
-                    _paused = true;
-
-                    // Cleanm-up buffer and check if we have enough free space
-                    if (VolPluginInterface.VolUpdateBufferState())
-                    {
-                        usedSize = VolPluginInterface.VolGetUsedBufferSize();
-                        freeSpace = maxSize - usedSize;
-
-                        // Resume if we have enough space
-                        if (freeSpace >= (_windowBytes + safetyBufferHeadroom))
-                            _paused = false;
-                    }
-                    if (_paused)
-                    {
-                        yield return null;
-                        continue;
-                    }
-                }
-
                 // Handle end of file and looping
-                if (_pos >= _fileSize)
+                if (_fileSize > 0 && _pos >= _fileSize)
                 {
-                    if (!_loop)
+                    if (_fileSize <= bufferSizeBytes)
+                    {
+                        // special case: file fits in buffer
+                        _stopped = true;
+                        break;
+                    }
+                    else if (!_loop)
                     {
                         // Reached end of file, pause downloading. Otherwise we will have to open a new request on reset or looping enabled.
                         PauseDownload();
@@ -244,9 +228,37 @@ public sealed class VolStreamingSession
                     continue;
                 }
 
+                // Check buffer space or wait for enough free space in buffer
+                long usedSize = VolPluginInterface.VolGetUsedBufferSize();
+                long freeSpace = bufferSizeBytes - usedSize;
+
                 // Calculate download range
                 long start = _pos;
-                long end = _fileSize > 0 ? Math.Min(start + _windowBytes - 1, _fileSize) : start + _windowBytes - 1;
+                long end = _fileSize > 0 ? Math.Min(start + _windowBytes - 1, _fileSize-1) : start + _windowBytes - 1;
+
+                long donwloadChunk = end - start + 1;
+
+                if (_paused || freeSpace < (donwloadChunk + safetyBufferHeadroom))
+                {
+                    _paused = true;
+
+                    // Clean-up buffer and check if we have enough free space
+                    if (VolPluginInterface.VolUpdateBufferState())
+                    {
+                        usedSize = VolPluginInterface.VolGetUsedBufferSize();
+                        freeSpace = bufferSizeBytes - usedSize;
+
+                        // Resume if we have enough space
+                        if (freeSpace >= (donwloadChunk + safetyBufferHeadroom))
+                            _paused = false;
+                    }
+                    if (_paused)
+                    {
+                        yield return null;
+                        continue;
+                    }
+                }
+
 
                 // Start Range request
                 using (_active = UnityWebRequest.Get(sourceUrl))
@@ -280,20 +292,13 @@ public sealed class VolStreamingSession
 
                     // Validate response code (206 preferred, 200 tolerated for servers without range)
                     var rc = _active.responseCode;
-                    if (rc == 206 || rc == 200)
+                    if (rc == 206 || rc == 200 || rc == 416)
                     {
                         _pos = start + _donwloadAdvanced;
-
-                        if (_fileSize > 0 && _pos > _fileSize)
-                        {
-                            if (_loop) _pos = VolPluginInterface.VolGetFrameBodyStart();
-                            else { PauseDownload(); break; }
-                        }
                     }
                     else if (rc == 416)
                     {
-                        if (_loop) _pos = VolPluginInterface.VolGetFrameBodyStart();
-                        else { PauseDownload(); break; }
+                        // A wrong range
                     }
                     else if (_active.result == UnityWebRequest.Result.ConnectionError ||
                              _active.result == UnityWebRequest.Result.ProtocolError)
