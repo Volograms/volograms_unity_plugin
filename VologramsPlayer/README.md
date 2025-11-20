@@ -1,5 +1,5 @@
 # Volograms Unity Player 
-Version 1.1.2
+Version 1.1.3
 
 ## Supported Platforms 
 * Windows (win64)

@@ -36,7 +36,7 @@ namespace Volograms
 
         [Header("Buffer Settings (Buffer Mode Only)")]
         [Tooltip("Buffer size in MB")]
-        public int bufferSizeMB = 50;
+        public int bufferSizeMB = 60;
         [Tooltip("Seconds of video to keep ahead")]
         public float bufferAheadSeconds = 2.0f;
 
@@ -77,6 +77,7 @@ namespace Volograms
         // When an animation starts this value is 0. When the last frame is played it is == video duration. On loop it resets to zero.
         private double _animationAccumulatedSeconds;
         private double _secondsPerFrame;
+        private double _framesPerSecond;
         private MeshFilter _meshFilter;
         private MeshRenderer _meshRenderer;
         private ushort[] _keyShortIndices;
@@ -132,17 +133,67 @@ namespace Volograms
             Open();
         }
 
+        private bool isBuffering(int desiredFrameIndex)
+        {
+            int lookaheadFrameIndex = desiredFrameIndex;
+            bool isFrameAvailable = false;
+
+            if (_isBuffering)
+            {
+                // Wait until we have enough frames buffered ahead
+                if (streamingMode == VolEnums.StreamingMode.Buffer)
+                {
+                    float bufferHealthSeconds = VolPluginInterface.VolGetBufferHealthSeconds((float)_framesPerSecond);
+                    if (bufferHealthSeconds < bufferAheadSeconds)
+                        return true;
+                }
+                else
+                {
+                    // During file streaming we just look ahead a few seconds
+                    lookaheadFrameIndex = Math.Min((int)(desiredFrameIndex + _framesPerSecond * bufferAheadSeconds), _numFrames - 1);
+                }
+            }
+
+            if (streamingMode == VolEnums.StreamingMode.File)
+                isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, lookaheadFrameIndex);
+            else // Buffer mode
+                isFrameAvailable = VolPluginInterface.VolIsFrameAvailableInBuffer(desiredFrameIndex);
+
+            if (!isFrameAvailable)
+            {
+                // Still downloading - pause plauyback until we have enough data.
+                //Debug.Log($"Buffering... waiting for frame {desiredFrameIndex}");
+                BufferingPause();
+                _isBuffering = true;
+
+                return true;
+            }
+            else
+            {
+                if (_isBuffering)
+                {
+                    //Debug.Log("Resuming playback after buffering.");
+                    BufferingResume();
+                }
+                _isBuffering = false;
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Unity's Update function - called every frame
         /// </summary>
         private void Update()
         {
+            double deltaTime = Time.deltaTime;
+
             if (!_isSeek)
             {
                 if (!IsOpen || !IsPlaying)
                     return;
             }
-            double deltaTime = Time.deltaTime;
+            
             if (IsPlaying && !_isBuffering)
             {
                 // Work out the frame index to play based on elapsed animation time. This lets us skip to the correct frame when the player is going slowly.
@@ -150,6 +201,7 @@ namespace Volograms
             }
 
             int desiredFrameIndex = (int)(_animationAccumulatedSeconds / _secondsPerFrame);
+
             // Not enough time has passed to advance to the next frame yet.
             if (desiredFrameIndex == _currentlyLoadedFrameIndex || desiredFrameIndex < 0) { return; }
 
@@ -170,45 +222,10 @@ namespace Volograms
                 return;
             }
 
-            // Streaming-aware frame check
-            bool isFrameAvailable = false;
-            if (_isStreaming)
-            {
-                if (_isBuffering)
-                {
-                    double fps = 1.0 / _secondsPerFrame;
-                    float bufferHealthSeconds = VolPluginInterface.VolGetBufferHealthSeconds((float)fps);
-                    if (bufferHealthSeconds < bufferAheadSeconds)
-                    {
-                        return;
-                    }
-                }
+            // Check if we are waiting for frames to download during streaming
+            if (_isStreaming && isBuffering(desiredFrameIndex)) return;
 
-                if (streamingMode == VolEnums.StreamingMode.File)
-                    isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, desiredFrameIndex);
-                else // Buffer mode
-                    isFrameAvailable = VolPluginInterface.VolIsFrameAvailableInBuffer(desiredFrameIndex);
-
-                if (!isFrameAvailable)
-                {
-                    // Still downloading - pause plauyback until we have enough data.
-                    Debug.Log($"Buffering... waiting for frame {desiredFrameIndex}");
-                    BufferingPause();
-                    _isBuffering = true;
-
-                    return;
-                }
-                else
-                {
-                    if (_isBuffering)
-                    {
-                        Debug.Log("Resuming playback after buffering.");
-                        BufferingResume();
-                    }
-                    _isBuffering = false;
-                }
-            }
-
+            // If we are buffering, we skip the actual frame loading until we have enough data.
             if (!_isBuffering)
             {
                 // --VIDEO TEXTURE--
@@ -246,8 +263,7 @@ namespace Volograms
             {
                 _streamingSession.SetLoopStreaming(isLooping);
 
-                double fps = 1.0 / _secondsPerFrame;
-                if (VolPluginInterface.VolShouldResumeDownload(_currentlyLoadedFrameIndex, (float)fps))
+                if (VolPluginInterface.VolShouldResumeDownload(_currentlyLoadedFrameIndex, (float)_framesPerSecond))
                     _streamingSession.ResumeDownload();
 
             }
@@ -594,9 +610,9 @@ namespace Volograms
             _currentlyLoadedFrameIndex = -1;
             _animationAccumulatedSeconds = 0f;
             _numFrames = VolPluginInterface.VolGeomGetFrameCount();
-            double fps = VolPluginInterface.VolGetFrameRate();
-            if (0.0 == fps) { fps = 30.0; }
-            _secondsPerFrame = 1f / fps; // TODO(Anton) -- we should fetch this from vol_av rather than rely on 30fps.
+            _framesPerSecond = VolPluginInterface.VolGetFrameRate();
+            if (0.0 == _framesPerSecond) { _framesPerSecond = 30.0; }
+            _secondsPerFrame = 1f / _framesPerSecond; // TODO(Anton) -- we should fetch this from vol_av rather than rely on 30fps.
 
             _textureId = Shader.PropertyToID(textureShaderId);
 
@@ -801,7 +817,7 @@ namespace Volograms
             }
 
             // Handle a special case where we need a first frame after a restart and it is not in the buffer anymore.
-            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer)
+            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer && !VolPluginInterface.VolIsFrameAvailableInBuffer(0))
                 _streamingSession.RestartFromStart();
 
             _currentlyLoadedFrameIndex = -1;
