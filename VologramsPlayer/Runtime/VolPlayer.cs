@@ -113,13 +113,19 @@ namespace Volograms
             _meshFilter.mesh = new Mesh();
         }
 #endif
-            if (!TryGetComponent<VideoPlayer>(out _audioPlayerVideo))
+            if (volFormat == VolEnums.VolFormat.Video)
             {
-                _audioPlayerVideo = gameObject.AddComponent<VideoPlayer>();
+                if (!TryGetComponent<VideoPlayer>(out _audioPlayerVideo))
+                {
+                    _audioPlayerVideo = gameObject.AddComponent<VideoPlayer>();
+                }
             }
-            if (!TryGetComponent<AudioSource>(out _audioPlayerVols))
+            if (volFormat == VolEnums.VolFormat.BasisU)
             {
-                _audioPlayerVols = gameObject.AddComponent<AudioSource>();
+                if (!TryGetComponent<AudioSource>(out _audioPlayerVols))
+                {
+                    _audioPlayerVols = gameObject.AddComponent<AudioSource>();
+                }
             }
 
             Open();
@@ -747,7 +753,6 @@ namespace Volograms
 
         private IEnumerator PlayCoroutine()
         {
-
             if (audioOn && _audioPlayerVideo != null)
             {
                 _audioPlayerVideo.Prepare();
@@ -755,8 +760,12 @@ namespace Volograms
                 _audioPlayerVideo.Play();
 
             }
-            if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Play();
-
+            if (audioOn && _audioPlayerVols != null)
+            {
+                _audioPlayerVols.clip.LoadAudioData();
+                yield return new WaitUntil(() => _audioPlayerVols.clip.loadState == AudioDataLoadState.Loaded);
+                _audioPlayerVols.Play();
+            }
             IsPlaying = true;
         }
 
