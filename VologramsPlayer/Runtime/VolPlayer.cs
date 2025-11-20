@@ -113,17 +113,15 @@ namespace Volograms
             _meshFilter.mesh = new Mesh();
         }
 #endif
-
-            //#if UNITY_ANDROID
-            //        //audioOn = true;
-            //#endif
-
-            //if (audioOn)
+            if (volFormat == VolEnums.VolFormat.Video)
             {
                 if (!TryGetComponent<VideoPlayer>(out _audioPlayerVideo))
                 {
                     _audioPlayerVideo = gameObject.AddComponent<VideoPlayer>();
                 }
+            }
+            if (volFormat == VolEnums.VolFormat.BasisU)
+            {
                 if (!TryGetComponent<AudioSource>(out _audioPlayerVols))
                 {
                     _audioPlayerVols = gameObject.AddComponent<AudioSource>();
@@ -301,6 +299,7 @@ namespace Volograms
                 if (www.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
                 {
                     AudioClip clip = UnityEngine.Networking.DownloadHandlerAudioClip.GetContent(www);
+                    clip.LoadAudioData();
                     _audioPlayerVols.clip = clip;
                     //Debug.Log("Audio Loaded");
                 }
@@ -342,17 +341,6 @@ namespace Volograms
         {
             StartCoroutine(OpenCoroutine(onComplete, onProgress));
         }
-
-        //private bool StartOpenMode()
-        //{
-        //    // Your existing Open logic
-        //    string headerFile = "";
-        //    _fullGeomPath = volFilePathType.ResolvePath(volFile);
-        //    bool geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, _fullGeomPath, false);
-        //    Debug.Log("OpenMode: Opened vologram geometry from: " + _fullGeomPath + ", success: " + geomOpened);
-
-        //    return geomOpened;
-        //}
 
         /// <summary>
         ///     
@@ -399,8 +387,9 @@ namespace Volograms
         /// </summary>
         /// <param name="volVideoTexture"></param>
         /// <param name="volFolder"></param>
+        /// 
         /// <returns></returns>
-        private bool OpenVideoSequence(string volVideoTexture, string volFolder)
+        private IEnumerator OpenVideoSequence(string volVideoTexture, string volFolder, System.Action<string> onError)
         {
             bool geomOpened = false;
             _hasVideoTexture = !string.IsNullOrEmpty(volVideoTexture);
@@ -424,8 +413,6 @@ namespace Volograms
                         _audioPlayerVideo.frameReady += AudioVideoPlayerOnFrameReady;
                         _audioPlayerVideo.loopPointReached -= AudioVideoPlayerOnLoopPointReached;
                         _audioPlayerVideo.loopPointReached += AudioVideoPlayerOnLoopPointReached;
-                        _audioPlayerVideo.prepareCompleted -= AudioVideoPlayerOnPrepareCompleted;
-                        _audioPlayerVideo.prepareCompleted += AudioVideoPlayerOnPrepareCompleted;
                         _audioPlayerVideo.errorReceived -= AudioVideoPlayerOnErrorReceived;
                         _audioPlayerVideo.errorReceived += AudioVideoPlayerOnErrorReceived;
 
@@ -436,6 +423,7 @@ namespace Volograms
                         _audioPlayerVideo.SetDirectAudioMute(0, false);
                         _audioPlayerVideo.controlledAudioTrackCount = 1;
                         _audioPlayerVideo.Prepare();
+                        yield return new WaitUntil(() => _audioPlayerVideo.isPrepared);
                     }
 
                     // Mesh
@@ -457,7 +445,10 @@ namespace Volograms
                     }
                 }
             }
-            return geomOpened;
+            if(!geomOpened)
+            {
+                onError?.Invoke("Failed to open video sequence vologram.");
+            }
         }
 
         /// <summary>
@@ -562,7 +553,19 @@ namespace Volograms
 
             if (VolEnums.VolFormat.Video == volFormat)
             {
-                geomOpened = OpenVideoSequence(volVideoTexture, volFolder);
+                bool errorOccurred = false;
+
+                System.Action<string> onError = errorMessage =>
+                {
+                    Debug.LogError("Error during streaming: " + errorMessage);
+                    errorOccurred = true;
+                };
+
+                yield return OpenVideoSequence(volVideoTexture, volFolder, onError);
+                if (!errorOccurred)
+                {
+                    geomOpened = true;
+                }
             }
             else if (VolEnums.VolFormat.BasisU == volFormat)
             {
@@ -748,6 +751,24 @@ namespace Volograms
             if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Play();
         }
 
+        private IEnumerator PlayCoroutine()
+        {
+            if (audioOn && _audioPlayerVideo != null)
+            {
+                _audioPlayerVideo.Prepare();
+                yield return new WaitUntil(() => _audioPlayerVideo.isPrepared);
+                _audioPlayerVideo.Play();
+
+            }
+            if (audioOn && _audioPlayerVols != null)
+            {
+                _audioPlayerVols.clip.LoadAudioData();
+                yield return new WaitUntil(() => _audioPlayerVols.clip.loadState == AudioDataLoadState.Loaded);
+                _audioPlayerVols.Play();
+            }
+            IsPlaying = true;
+        }
+
         /// <summary>
         /// Play the vologram
         /// </summary>
@@ -756,11 +777,7 @@ namespace Volograms
             if (!IsOpen)
                 return;
 
-            IsPlaying = true;
-
-            if (audioOn && _audioPlayerVideo != null) _audioPlayerVideo.Play();
-            if (audioOn && _audioPlayerVols != null) _audioPlayerVols.Play();
-
+            StartCoroutine(PlayCoroutine());
         }
 
         /// <summary>
@@ -1171,12 +1188,6 @@ namespace Volograms
         private void AudioVideoPlayerOnErrorReceived(VideoPlayer source, string message)
         {
             Debug.LogError(message);
-        }
-
-        private void AudioVideoPlayerOnPrepareCompleted(VideoPlayer source)
-        {
-            source.Play();
-            Play();
         }
 
         private void AudioVideoPlayerOnLoopPointReached(VideoPlayer source)
