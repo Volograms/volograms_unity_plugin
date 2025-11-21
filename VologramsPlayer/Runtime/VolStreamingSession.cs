@@ -38,7 +38,9 @@ public sealed class VolStreamingSession
     public bool IsRunning { get; private set; }
     public bool IsPaused => _paused;
 
-    public VolStreamingSession(MonoBehaviour runner) { _runner = runner; }
+    private VolPluginInterface.VolNativeContext _ctx;
+
+    public VolStreamingSession(MonoBehaviour runner, VolPluginInterface.VolNativeContext ctx) { _runner = runner; _ctx = ctx; }
 
     public void Stop()
     {
@@ -63,7 +65,7 @@ public sealed class VolStreamingSession
     public void SetLoopStreaming(bool enable) { _loop = enable; }
     public void RestartFromStart() 
     { 
-        _seekLocation = VolPluginInterface.VolGetFrameBodyStart();
+        _seekLocation = _ctx.GetFrameBodyStart();
         _seeking = true; 
         _paused = false;
     }
@@ -103,7 +105,7 @@ public sealed class VolStreamingSession
                     // Open header when enough bytes are locally available
                     if (!isOpened && _active.downloadedBytes > 4L * 1024 * 1024)
                     {
-                        isOpened = VolPluginInterface.VolGeomOpenFile(headerPath, destPath, false);
+                        isOpened = _ctx.OpenGeom(headerPath, destPath, false);
                         if (isOpened) onHeaderOpen?.Invoke(isOpened);
                     }
 
@@ -120,7 +122,7 @@ public sealed class VolStreamingSession
                 {
                     if (!isOpened)
                     {
-                        isOpened = VolPluginInterface.VolGeomOpenFile(headerPath, destPath, false);
+                        isOpened = _ctx.OpenGeom(headerPath, destPath, false);
                         onHeaderOpen?.Invoke(isOpened);
                     }
                 }
@@ -180,10 +182,10 @@ public sealed class VolStreamingSession
 
             // Initialize your streaming buffer and config in the native plugin.
             bufferSizeBytes = Math.Min(Math.Max(5 * 1024 * 1024, _fileSize + safetyBufferHeadroom + 1), bufferSizeBytes);
-            VolPluginInterface.VolInitStreamingConfig();
-            VolPluginInterface.VolSetMaxBufferSize(bufferSizeBytes);
-            VolPluginInterface.VolSetLookaheadSeconds(lookaheadSeconds);
-            if (!VolPluginInterface.VolCreateStreamingBuffer())
+            _ctx.InitStreamingConfig();
+            _ctx.SetMaxBufferSize(bufferSizeBytes);
+            _ctx.SetLookaheadSeconds(lookaheadSeconds);
+            if (!_ctx.CreateStreamingBuffer())
             {
                 onError?.Invoke("Failed to create streaming buffer");
                 Stop();
@@ -203,8 +205,8 @@ public sealed class VolStreamingSession
 
                     // Order is important: reset frame directory first, then update buffer state.
                     if(_fileSize > bufferSizeBytes) {
-                    VolPluginInterface.VolResetFrameDirectory();
-                    VolPluginInterface.VolUpdateBufferState();
+                    _ctx.ResetFrameDirectory();
+                    _ctx.UpdateBufferState();
                     }
                     _seeking = false;
                 }
@@ -223,13 +225,13 @@ public sealed class VolStreamingSession
                         // Reached end of file, pause downloading. Otherwise we will have to open a new request on reset or looping enabled.
                         PauseDownload();
                     }
-                    _pos = VolPluginInterface.VolGetFrameBodyStart();
+                    _pos = _ctx.GetFrameBodyStart();
                     yield return null;
                     continue;
                 }
 
                 // Check buffer space or wait for enough free space in buffer
-                long usedSize = VolPluginInterface.VolGetUsedBufferSize();
+                long usedSize = _ctx.GetUsedBufferSize();
                 long freeSpace = bufferSizeBytes - usedSize;
 
                 // Calculate download range
@@ -243,9 +245,9 @@ public sealed class VolStreamingSession
                     _paused = true;
 
                     // Clean-up buffer and check if we have enough free space
-                    if (VolPluginInterface.VolUpdateBufferState())
+                    if (_ctx.UpdateBufferState())
                     {
-                        usedSize = VolPluginInterface.VolGetUsedBufferSize();
+                        usedSize = _ctx.GetUsedBufferSize();
                         freeSpace = bufferSizeBytes - usedSize;
 
                         // Resume if we have enough space
@@ -283,7 +285,7 @@ public sealed class VolStreamingSession
                         // Header open once enough data is buffered to parse file info
                         if (!headerOpened && _downloadedBytes > 4L * 1024 * 1024)
                         {
-                            headerOpened = VolPluginInterface.VolCreateStreamingFileInfo();
+                            headerOpened = _ctx.CreateStreamingFileInfo();
                             if (headerOpened) onHeaderOpen?.Invoke(headerOpened);
                         }
 
@@ -329,7 +331,7 @@ public sealed class VolStreamingSession
         try
         {
             IntPtr ptr = handle.AddrOfPinnedObject();
-            bool ok = VolPluginInterface.VolAddDataToBuffer(ptr, dataLength);
+            bool ok = _ctx.AddDataToBuffer(ptr, dataLength);
             if (!ok) _paused = true; // let the loop's resume policy handle it
             _downloadedBytes += dataLength;
             _donwloadAdvanced += dataLength;

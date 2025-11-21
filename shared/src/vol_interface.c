@@ -51,6 +51,65 @@ extern "C"
 #include "IUnityRenderingExtensions.h"
 #endif
 
+/**
+ * Per-instance native context to support multiple volograms in one process.
+ * This replaces previous global/static state.
+ */
+typedef struct vol_context_t {
+    // Geometry
+    vol_geom_info_t geom_file_info;
+    vol_geom_frame_data_t geom_frame_data;
+
+    // Basis decode temporary buffer
+    uint8_t* output_blocks_ptr;
+
+    // Video
+    vol_av_video_t video_file_ptr;
+    int vid_w;
+    int vid_h;
+    double vid_dur;
+    int64_t vid_num_frms;
+    int vid_frm_size;
+
+    // Streaming configuration/state
+    vol_geom_streaming_config_t streaming_config;
+} vol_context_t;
+
+// Default singleton context to preserve backward compatibility with legacy exports.
+static vol_context_t* _default_ctx = 0;
+static vol_context_t* _get_default_ctx( void ) {
+    if ( !_default_ctx ) {
+        _default_ctx = (vol_context_t*)malloc( sizeof( vol_context_t ) );
+        if ( _default_ctx ) {
+            memset( _default_ctx, 0, sizeof( vol_context_t ) );
+        }
+    }
+    return _default_ctx;
+}
+
+DllExport vol_context_t* native_vol_context_create( void ) {
+    vol_context_t* ctx = (vol_context_t*)malloc( sizeof( vol_context_t ) );
+    if ( !ctx ) { return 0; }
+    memset( ctx, 0, sizeof( vol_context_t ) );
+    return ctx;
+}
+
+DllExport void native_vol_context_destroy( vol_context_t* ctx ) {
+    if ( !ctx ) { return; }
+    if ( ctx->output_blocks_ptr ) {
+        free( ctx->output_blocks_ptr );
+        ctx->output_blocks_ptr = 0;
+    }
+    if ( ctx->video_file_ptr._context_ptr ) {
+        vol_av_close( &ctx->video_file_ptr );
+    }
+    if ( ctx->geom_file_info.hdr.frame_count > 0 || ctx->geom_file_info.frames_directory_ptr ) {
+        vol_geom_free_file_info( &ctx->geom_file_info );
+    }
+    memset( ctx, 0, sizeof( vol_context_t ) );
+    free( ctx );
+}
+
 //  Unity logging taken from: https://stackoverflow.com/questions/43732825/use-debug-log-from-c 
 /** Unity logging callback type */
 typedef void( *vol_interface_log_callback )( int type, const char* message );
@@ -146,49 +205,60 @@ double apg_time_s( void ) {
  * Geometry file
  */
 
-/** Struct containing details of the opened geometry file */
-static vol_geom_info_t geom_file_ptr;
-/** Struct containing read geometry data */
-static vol_geom_frame_data_t geom_frame_data;
+/** Structs moved into per-instance context (see vol_context_t) */
 
 /** Open the geometry file
  @param hdr_filename    Path to the header file
  @param seq_filename    Path to the sequence file
  @returns               If the operation was successful
  */
-DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* seq_filename, bool streaming_mode)
+DllExport bool native_vol_open_geom_file_ctx( vol_context_t* ctx, const char* hdr_filename, const char* seq_filename, bool streaming_mode )
 {
-    memset(&geom_file_ptr, 0, sizeof(vol_geom_info_t));
+    if ( !ctx ) { return false; }
+    memset( &ctx->geom_file_info, 0, sizeof( vol_geom_info_t ) );
     bool opened = false;
-
-    if(hdr_filename[0] != '\0')
-        opened = vol_geom_create_file_info(hdr_filename, seq_filename, &geom_file_ptr, streaming_mode);
+    if ( hdr_filename && hdr_filename[0] != '\0' )
+        opened = vol_geom_create_file_info( hdr_filename, seq_filename, &ctx->geom_file_info, streaming_mode );
     else 
-        opened = vol_geom_create_file_info_from_file(seq_filename, &geom_file_ptr);
+        opened = vol_geom_create_file_info_from_file( seq_filename, &ctx->geom_file_info );
     
     if ( !opened )
-        return opened;
+        return false;
         
-    memset( &geom_frame_data, 0, sizeof(vol_geom_frame_data_t));
+    memset( &ctx->geom_frame_data, 0, sizeof(vol_geom_frame_data_t));
     
     return true;
+}
+DllExport bool native_vol_open_geom_file(const char* hdr_filename, const char* seq_filename, bool streaming_mode)
+{
+    return native_vol_open_geom_file_ctx( _get_default_ctx(), hdr_filename, seq_filename, streaming_mode );
 }
 
 /** Clears the loaded geometry data
  @returns   `true` if the file closed successfully, `false` otherwise
  */
+DllExport bool native_vol_free_geom_data_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return false; }
+    bool ret = vol_geom_free_file_info( &ctx->geom_file_info );
+    return ret;
+}
 DllExport bool native_vol_free_geom_data(void)
 {
-    bool ret = vol_geom_free_file_info( &geom_file_ptr );
-    return ret;
+    return native_vol_free_geom_data_ctx( _get_default_ctx() );
 }
 
 /** Get the number of frames in the geometry file
  @returns   Number of geometry frames in the file
  */
+DllExport int native_vol_get_geom_frame_count_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    return ctx->geom_file_info.hdr.frame_count;
+}
 DllExport int native_vol_get_geom_frame_count(void)
 {
-    return geom_file_ptr.hdr.frame_count;
+    return native_vol_get_geom_frame_count_ctx( _get_default_ctx() );
 }
 
 /** Reads the specified geometry frame
@@ -196,64 +266,96 @@ DllExport int native_vol_get_geom_frame_count(void)
  @param frame           Index of the frame you want to read
  @returns               If the operation was a success
  */
-DllExport bool native_vol_read_geom_frame(const char* seq_filename, int frame) 
+DllExport bool native_vol_read_geom_frame_ctx(const char* seq_filename, int frame, vol_context_t* ctx) 
 {
-    if ( frame >= (int32_t) geom_file_ptr.hdr.frame_count )
+    if ( !ctx ) { return false; }
+    if ( frame >= (int32_t) ctx->geom_file_info.hdr.frame_count )
         return false;
 
-    bool ret = vol_geom_read_frame( seq_filename, &geom_file_ptr, frame, &geom_frame_data );
+    bool ret = vol_geom_read_frame( seq_filename, &ctx->geom_file_info, frame, &ctx->geom_frame_data );
     return ret; 
+}
+DllExport bool native_vol_read_geom_frame(const char* seq_filename, int frame) 
+{
+    return native_vol_read_geom_frame_ctx( seq_filename, frame, _get_default_ctx() );
 }
 
 /**
  * @returns Returns true if the given frame_idx is valid and is also a keyframe, in the currently opened vologram's geometry.
  */
+DllExport bool native_vol_geom_is_keyframe_ctx( int frame_idx, vol_context_t* ctx ) {
+    if ( !ctx ) { return false; }
+    return vol_geom_is_keyframe( &ctx->geom_file_info, frame_idx );
+}
 DllExport bool native_vol_geom_is_keyframe( int frame_idx ) {
-    return vol_geom_is_keyframe( &geom_file_ptr, frame_idx );
+    return native_vol_geom_is_keyframe_ctx( frame_idx, _get_default_ctx() );
 }
 
 /**
  * @returns Returns the index of the keyframe prior to frame_idx, in the currently opened vologram's geometry.
  */
+DllExport int native_vol_geom_find_previous_keyframe_ctx( int frame_idx, vol_context_t* ctx ) {
+    if ( !ctx ) { return -1; }
+    return vol_geom_find_previous_keyframe( &ctx->geom_file_info, frame_idx );
+}
 DllExport int native_vol_geom_find_previous_keyframe( int frame_idx ) {
-    return vol_geom_find_previous_keyframe( &geom_file_ptr, frame_idx );
+    return native_vol_geom_find_previous_keyframe_ctx( frame_idx, _get_default_ctx() );
 }
 
 /** Get the geometry data of the current loaded frame
  @returns   Struct containing details of the geometry data
  */
+DllExport vol_geom_frame_data_t native_vol_get_geom_ptr_data_ctx(vol_context_t* ctx)
+{
+    if ( !ctx ) { vol_geom_frame_data_t zero; memset( &zero, 0, sizeof zero ); return zero; }
+    return ctx->geom_frame_data;
+}
 DllExport vol_geom_frame_data_t native_vol_get_geom_ptr_data(void)
 {
-    return geom_frame_data;
+    return native_vol_get_geom_ptr_data_ctx( _get_default_ctx() );
 }
 
 /** Gets the geom info struct including the data of the last loaded mesh
  @returns   Struct containing the geometry info
  */
+DllExport vol_geom_info_t native_vol_get_geom_info_ctx(vol_context_t* ctx)
+{
+    if ( !ctx ) { vol_geom_info_t zero; memset( &zero, 0, sizeof zero ); return zero; }
+    return ctx->geom_file_info;
+}
 DllExport vol_geom_info_t native_vol_get_geom_info(void)
 {
-    return geom_file_ptr;
+    return native_vol_get_geom_info_ctx( _get_default_ctx() );
 }
 
 /** Check if audio data is present in the vologram
  * @returns   true if audio data is present, false otherwise
  */
-DllExport bool native_vol_has_audio(void) {
-    vol_geom_info_t vol_info = native_vol_get_geom_info();
+DllExport bool native_vol_has_audio_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return false; }
+    vol_geom_info_t vol_info = native_vol_get_geom_info_ctx( ctx );
     return (bool) vol_info.hdr.audio;
+}
+DllExport bool native_vol_has_audio(void) {
+    return native_vol_has_audio_ctx( _get_default_ctx() );
 }
 
 /** Get pointer to the audio data
 * @returns   Pointer to the audio data
 */
-DllExport uint8_t* native_vol_get_audio(int* outSize)
+DllExport uint8_t* native_vol_get_audio_ctx(vol_context_t* ctx, int* outSize)
 {
-    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    if ( !ctx ) { return 0; }
+    vol_geom_info_t vol_info = native_vol_get_geom_info_ctx( ctx );
     if (!vol_info.hdr.audio) {
         return 0;
     }
-	*outSize = vol_info.audio_data_sz;
+    if ( outSize ) { *outSize = vol_info.audio_data_sz; }
     return vol_info.audio_data_ptr;
+}
+DllExport uint8_t* native_vol_get_audio(int* outSize)
+{
+    return native_vol_get_audio_ctx( _get_default_ctx(), outSize );
 }
 
 /** Update missing items in frames directory initially created by vol_geom_create_file_info_from_file.
@@ -261,18 +363,22 @@ DllExport uint8_t* native_vol_get_audio(int* outSize)
  @param frame           Index of the frame you want to update
  @returns               If the operation was a success
  */
-DllExport bool native_vol_update_frames_directory(const char* seq_filename, int frame) {
-    vol_geom_info_t vol_info = native_vol_get_geom_info();
+DllExport bool native_vol_update_frames_directory_ctx(vol_context_t* ctx, const char* seq_filename, int frame) {
+    if ( !ctx ) { return false; }
+    vol_geom_info_t vol_info = native_vol_get_geom_info_ctx( ctx );
     return vol_geom_update_frames_directory(seq_filename, &vol_info, frame);
+}
+DllExport bool native_vol_update_frames_directory(const char* seq_filename, int frame) {
+    return native_vol_update_frames_directory_ctx( _get_default_ctx(), seq_filename, frame );
 }
 
 /**
  * Basis Texture from Vols File
  */
-static uint8_t* output_blocks_ptr = 0;
 
-DllExport bool native_vol_basis_init(void)
+DllExport bool native_vol_basis_init_ctx( vol_context_t* ctx )
 {
+    if ( !ctx ) { return false; }
     bool res = vol_basis_init();
     if (!res) {
         log_callback(4, "basis_init - vol_basis_init failed\n");
@@ -280,162 +386,213 @@ DllExport bool native_vol_basis_init(void)
     }
     return true;
 }
+DllExport bool native_vol_basis_init(void)
+{
+    return native_vol_basis_init_ctx( _get_default_ctx() );
+}
 
 /** Read the next frame of the video
  @returns   Pointer to the video frame pixel data
  */
-DllExport uint8_t * native_vol_read_next_texture_frame( int format )
+DllExport uint8_t * native_vol_read_next_texture_frame_ctx( vol_context_t* ctx, int format )
 {
-    vol_geom_info_t vol_info = native_vol_get_geom_info();
+    if ( !ctx ) { return 0; }
+    vol_geom_info_t vol_info = native_vol_get_geom_info_ctx( ctx );
     if(vol_info.hdr.textured) {
         
         uint32_t texture_size = vol_info.hdr.texture_width * vol_info.hdr.texture_height*3;
 
-        if(output_blocks_ptr == 0)
-            output_blocks_ptr = (uint8_t*)malloc( texture_size );
+        if(ctx->output_blocks_ptr == 0)
+            ctx->output_blocks_ptr = (uint8_t*)malloc( texture_size );
 
-        vol_geom_frame_data_t vols_frame_data = native_vol_get_geom_ptr_data();
+        vol_geom_frame_data_t vols_frame_data = native_vol_get_geom_ptr_data_ctx( ctx );
 
         int w = 0, h = 0;
         uint8_t* vols_texture_ptr = (uint8_t*)&vols_frame_data.block_data_ptr[vols_frame_data.texture_offset];
         int32_t vols_texture_sz = vols_frame_data.texture_sz;
 
-        if (!vol_basis_transcode(format, vols_texture_ptr, vols_texture_sz, output_blocks_ptr, texture_size, &w, &h)) {
+        if (!vol_basis_transcode(format, vols_texture_ptr, vols_texture_sz, ctx->output_blocks_ptr, texture_size, &w, &h)) {
             log_callback(3, "Decoding basis texture failed!");
             return 0;
         }
-        return output_blocks_ptr;
+        return ctx->output_blocks_ptr;
     } else {
         return 0;
     }
+}
+DllExport uint8_t * native_vol_read_next_texture_frame( int format )
+{
+    return native_vol_read_next_texture_frame_ctx( _get_default_ctx(), format );
 }
 
 /** Get the size of a video frame in bytes
  @returns   The number of bytes in a video frame
  */
+DllExport int64_t native_vol_get_texture_frame_size_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    vol_geom_info_t vol_info = native_vol_get_geom_info_ctx( ctx );
+    return vol_info.hdr.texture_width * vol_info.hdr.texture_height*3;
+}
 DllExport int64_t native_vol_get_texture_frame_size(void)
 {
-    vol_geom_info_t vol_info = native_vol_get_geom_info();
-    return vol_info.hdr.texture_width * vol_info.hdr.texture_height*3;
+    return native_vol_get_texture_frame_size_ctx( _get_default_ctx() );
 }
 
 
 /** Get the width in pixels of the video
  @returns   The pixel width of the video
  */
+DllExport int native_vol_get_texture_width_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    vol_geom_info_t vol_info = native_vol_get_geom_info_ctx( ctx );
+    return vol_info.hdr.texture_width;
+}
 DllExport int native_vol_get_texture_width(void)
 {
-    vol_geom_info_t vol_info = native_vol_get_geom_info();
-    return vol_info.hdr.texture_width;
+    return native_vol_get_texture_width_ctx( _get_default_ctx() );
 }
 
 /** Get the height in pixels of the video
  @returns   The pixel height of the video
  */
+DllExport int native_vol_get_texture_height_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    vol_geom_info_t vol_info = native_vol_get_geom_info_ctx( ctx );
+    return vol_info.hdr.texture_height;
+}
 DllExport int native_vol_get_texture_height(void)
 {
-    vol_geom_info_t vol_info = native_vol_get_geom_info();
-    return vol_info.hdr.texture_height;
+    return native_vol_get_texture_height_ctx( _get_default_ctx() );
 }
 
 /**
  * Video File
  */
 
-/** Struct containing details of the loaded video file */
-static vol_av_video_t video_file_ptr;
-/** The pixel width of the loaded video */
-static int vid_w = 0;
-/** The pixel height of the loaded video */
-static int vid_h = 0;
-/** The duration in seconds of the loaded video */
-static double vid_dur = 0.0;
-/** The number of frames in the loaded video */
-static int64_t vid_num_frms = 0;
-/** The number of bytes in a single from of the loaded video */
-static int vid_frm_size = 0;
-
 /** Open the video texture file for a vologram
  @param filename    Path to the video texture file
  @returns           `true` if file was opened sucessfully, `false` otherwise
  */
-DllExport bool native_vol_open_video_file(const char* filename)
+DllExport bool native_vol_open_video_file_ctx( vol_context_t* ctx, const char* filename )
 {
-    memset( &video_file_ptr, 0, sizeof(vol_av_video_t));
-    bool ret = vol_av_open(filename, &video_file_ptr);
+    if ( !ctx ) { return false; }
+    memset( &ctx->video_file_ptr, 0, sizeof(vol_av_video_t));
+    bool ret = vol_av_open(filename, &ctx->video_file_ptr);
 #ifdef VOL_TEST_TIMERS
     apg_time_init();
 #endif
     if ( ret ) {
-        vol_av_dimensions( &video_file_ptr, &vid_w, &vid_h );
-        vid_num_frms = vol_av_frame_count( &video_file_ptr );
-        vid_dur = vol_av_duration_s( &video_file_ptr );
-        vid_frm_size = vid_w * vid_h * 3;
+        vol_av_dimensions( &ctx->video_file_ptr, &ctx->vid_w, &ctx->vid_h );
+        ctx->vid_num_frms = vol_av_frame_count( &ctx->video_file_ptr );
+        ctx->vid_dur = vol_av_duration_s( &ctx->video_file_ptr );
+        ctx->vid_frm_size = ctx->vid_w * ctx->vid_h * 3;
     }
     
     return ret;
+}
+DllExport bool native_vol_open_video_file(const char* filename)
+{
+    return native_vol_open_video_file_ctx( _get_default_ctx(), filename );
 }
 
 /** Close the video texture file
  @returns   `true` if the file was closed sucessfully, `false` otherwise
  */
+DllExport bool native_vol_close_video_file_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return false; }
+    ctx->vid_w = 0;
+    ctx->vid_h = 0;
+    ctx->vid_dur = 0.0;
+    ctx->vid_num_frms = 0;
+    ctx->vid_frm_size = 0;
+    return vol_av_close( &ctx->video_file_ptr );
+}
 DllExport bool native_vol_close_video_file(void)
 {
-    vid_w = 0;
-    vid_h = 0;
-    vid_dur = 0.0;
-    vid_num_frms = 0;
-    vid_frm_size = 0;
-    return vol_av_close( &video_file_ptr );
+    return native_vol_close_video_file_ctx( _get_default_ctx() );
 }
 
 /** Get the width in pixels of the video
  @returns   The pixel width of the video
  */
+DllExport int native_vol_get_video_width_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    return ctx->vid_w;
+}
 DllExport int native_vol_get_video_width(void)
 {
-    return vid_w;
+    return native_vol_get_video_width_ctx( _get_default_ctx() );
 }
 
 /** Get the height in pixels of the video
  @returns   The pixel height of the video
  */
+DllExport int native_vol_get_video_height_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    return ctx->vid_h;
+}
 DllExport int native_vol_get_video_height(void)
 {
-    return vid_h;
+    return native_vol_get_video_height_ctx( _get_default_ctx() );
 }
 
 /** Get the rate of playback in frames per second of the video
  @returns   The frame rate of the video
  */
+DllExport double native_vol_get_video_frame_rate_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0.0; }
+    // It's safer to check on demand because this can change during playback.
+    return vol_av_frame_rate( &ctx->video_file_ptr );
+}
 DllExport double native_vol_get_video_frame_rate(void)
 {
-    // It's safer to check on demand because this can change during playback.
-    return vol_av_frame_rate( &video_file_ptr );
+    return native_vol_get_video_frame_rate_ctx( _get_default_ctx() );
 }
 
 /** Get the number of frames in the video
  @returns   The frame count of the video
  */
+DllExport int64_t native_vol_get_video_frame_count_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    return ctx->vid_num_frms;
+}
 DllExport int64_t native_vol_get_video_frame_count(void)
 {
-    return vid_num_frms;
+    return native_vol_get_video_frame_count_ctx( _get_default_ctx() );
 }
 
 /** Get the length of the video in seconds
  @returns   The duration of the video
  */
+DllExport double native_vol_get_video_duration_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0.0; }
+    return ctx->vid_dur;
+}
 DllExport double native_vol_get_video_duration(void)
 {
-    return vid_dur;
+    return native_vol_get_video_duration_ctx( _get_default_ctx() );
 }
 
 /** Get the size of a video frame in bytes
  @returns   The number of bytes in a video frame
  */
+DllExport int64_t native_vol_get_video_frame_size_ctx( vol_context_t* ctx )
+{
+    if ( !ctx ) { return 0; }
+    return ctx->vid_frm_size;
+}
 DllExport int64_t native_vol_get_video_frame_size(void)
 {
-    return vid_frm_size;
+    return native_vol_get_video_frame_size_ctx( _get_default_ctx() );
 }
 
 /** Vertically mirror image memory by swapping the top half of rows with the bottom half.
@@ -470,11 +627,16 @@ static void _image_flip_vertical( uint8_t* bytes_ptr, int width, int height, int
 /** Read the next frame of the video
  @returns   Pointer to the video frame pixel data
  */
+DllExport uint8_t * native_vol_read_next_video_frame_ctx( vol_context_t* ctx, bool flip_vertical )
+{
+    if ( !ctx ) { return 0; }
+    vol_av_read_next_frame( &ctx->video_file_ptr );
+    if ( flip_vertical ) { _image_flip_vertical(ctx->video_file_ptr.pixels_ptr, ctx->vid_w, ctx->vid_h, 3); }
+    return ctx->video_file_ptr.pixels_ptr;
+}
 DllExport uint8_t * native_vol_read_next_video_frame( bool flip_vertical )
 {
-    vol_av_read_next_frame( &video_file_ptr );
-    if ( flip_vertical ) { _image_flip_vertical(video_file_ptr.pixels_ptr, vid_w, vid_h, 3); }
-    return video_file_ptr.pixels_ptr;
+    return native_vol_read_next_video_frame_ctx( _get_default_ctx(), flip_vertical );
 }
     
 #ifdef ENABLE_UNITY_RENDER_FUNCS
@@ -533,96 +695,161 @@ UnityRenderingEventAndData UNITY_INTERFACE_API get_texture_update_callback(void)
  * Circular Streaming Buffer
  */
 
-static vol_geom_streaming_config_t g_streaming_config;
-
 // Configuration
+DllExport bool native_vol_init_streaming_config_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return false; }
+    return vol_geom_init_streaming_config(&ctx->streaming_config);
+}
 DllExport bool native_vol_init_streaming_config() {
-    return vol_geom_init_streaming_config(&g_streaming_config);
+    return native_vol_init_streaming_config_ctx( _get_default_ctx() );
 }
 
+DllExport bool native_vol_should_use_streaming_mode_ctx( vol_context_t* ctx, int64_t file_size ) {
+    if ( !ctx ) { return false; }
+    return vol_geom_should_use_streaming_mode(file_size, &ctx->streaming_config);
+}
 DllExport bool native_vol_should_use_streaming_mode(int64_t file_size) {
-    return vol_geom_should_use_streaming_mode(file_size, &g_streaming_config);
+    return native_vol_should_use_streaming_mode_ctx( _get_default_ctx(), file_size );
 }
 
+DllExport void native_vol_set_max_buffer_size_ctx( vol_context_t* ctx, int64_t bytes ) {
+    if ( !ctx ) { return; }
+    ctx->streaming_config.max_buffer_size = bytes;
+}
 DllExport void native_vol_set_max_buffer_size(int64_t bytes) {
-    g_streaming_config.max_buffer_size = bytes;
+    native_vol_set_max_buffer_size_ctx( _get_default_ctx(), bytes );
 }
 
+DllExport void native_vol_set_lookahead_seconds_ctx( vol_context_t* ctx, float seconds ) {
+    if ( !ctx ) { return; }
+    ctx->streaming_config.lookahead_seconds = seconds;
+}
 DllExport void native_vol_set_lookahead_seconds(float seconds) {
-    g_streaming_config.lookahead_seconds = seconds;
+    native_vol_set_lookahead_seconds_ctx( _get_default_ctx(), seconds );
 }
 
-DllExport bool native_vol_create_streaming_buffer() {
+DllExport bool native_vol_create_streaming_buffer_ctx( vol_context_t* ctx ) {
     
-    memset(&geom_file_ptr, 0, sizeof(vol_geom_info_t));
+    if ( !ctx ) { return false; }
+    memset(&ctx->geom_file_info, 0, sizeof(vol_geom_info_t));
     
-    return vol_geom_create_streaming_buffer(&geom_file_ptr, &g_streaming_config);
+    return vol_geom_create_streaming_buffer(&ctx->geom_file_info, &ctx->streaming_config);
 
-    memset(&geom_frame_data, 0, sizeof(vol_geom_frame_data_t));
+    memset(&ctx->geom_frame_data, 0, sizeof(vol_geom_frame_data_t));
+}
+DllExport bool native_vol_create_streaming_buffer() {
+    return native_vol_create_streaming_buffer_ctx( _get_default_ctx() );
 }
 
 // Add data
+DllExport bool native_vol_add_data_to_buffer_ctx( vol_context_t* ctx, const uint8_t* data_ptr, int64_t data_size ) {
+	// pass in directly as we are changing it. 
+    if ( !ctx ) { return false; }
+    return vol_geom_add_data_to_buffer(&ctx->geom_file_info, data_ptr, data_size);
+}
 DllExport bool native_vol_add_data_to_buffer(const uint8_t* data_ptr, int64_t data_size) {
-	// pass in directly geom_file_ptr as we are changing it. 
-    return vol_geom_add_data_to_buffer(&geom_file_ptr, data_ptr, data_size);
+    return native_vol_add_data_to_buffer_ctx( _get_default_ctx(), data_ptr, data_size );
 }
 
 // Frame directory
+DllExport bool native_vol_update_buffer_frame_directory_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return false; }
+    return vol_geom_update_buffer_frame_directory(&ctx->geom_file_info);
+}
 DllExport bool native_vol_update_buffer_frame_directory() {
-    return vol_geom_update_buffer_frame_directory(&geom_file_ptr);
+    return native_vol_update_buffer_frame_directory_ctx( _get_default_ctx() );
 }
 
 // Frame reading
-DllExport bool native_vol_read_frame_streaming(uint32_t frame_idx) {
+DllExport bool native_vol_read_frame_streaming_ctx( vol_context_t* ctx, uint32_t frame_idx ) {
     
-    if (frame_idx >= (int32_t)geom_file_ptr.hdr.frame_count)
+    if ( !ctx ) { return false; }
+    if (frame_idx >= (int32_t)ctx->geom_file_info.hdr.frame_count)
         return false;
 
-    bool ret = vol_geom_read_frame_streaming(&geom_file_ptr, frame_idx, &geom_frame_data);
+    bool ret = vol_geom_read_frame_streaming(&ctx->geom_file_info, frame_idx, &ctx->geom_frame_data);
     return ret;
 }
+DllExport bool native_vol_read_frame_streaming(uint32_t frame_idx) {
+    return native_vol_read_frame_streaming_ctx( _get_default_ctx(), frame_idx );
+}
 
-DllExport bool native_vol_is_frame_available_in_buffer(uint32_t frame_idx) {
-    vol_geom_info_t g_info = native_vol_get_geom_info();
+DllExport bool native_vol_is_frame_available_in_buffer_ctx( vol_context_t* ctx, uint32_t frame_idx ) {
+    if ( !ctx ) { return false; }
+    vol_geom_info_t g_info = native_vol_get_geom_info_ctx( ctx );
     return vol_geom_is_frame_available_in_buffer(&g_info, frame_idx);
+}
+DllExport bool native_vol_is_frame_available_in_buffer(uint32_t frame_idx) {
+    return native_vol_is_frame_available_in_buffer_ctx( _get_default_ctx(), frame_idx );
 }
 
 // Buffer management
+DllExport bool native_vol_update_buffer_state_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return false; }
+    return vol_geom_update_buffer_state(&ctx->geom_file_info);
+}
 DllExport bool native_vol_update_buffer_state() {
-    return vol_geom_update_buffer_state(&geom_file_ptr);
+    return native_vol_update_buffer_state_ctx( _get_default_ctx() );
 }
 
-DllExport bool native_vol_is_download_buffer_full() {
-    vol_geom_info_t g_info = native_vol_get_geom_info();
+DllExport bool native_vol_is_download_buffer_full_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return false; }
+    vol_geom_info_t g_info = native_vol_get_geom_info_ctx( ctx );
     return vol_geom_is_download_buffer_full(&g_info);
 }
+DllExport bool native_vol_is_download_buffer_full() {
+    return native_vol_is_download_buffer_full_ctx( _get_default_ctx() );
+}
 
+DllExport bool native_vol_should_resume_download_ctx( vol_context_t* ctx, uint32_t current_frame, float fps ) {
+    if ( !ctx ) { return false; }
+    return vol_geom_should_resume_download(&ctx->geom_file_info, current_frame, fps);
+}
 DllExport bool native_vol_should_resume_download(uint32_t current_frame, float fps) {
-    return vol_geom_should_resume_download(&geom_file_ptr, current_frame, fps);
+    return native_vol_should_resume_download_ctx( _get_default_ctx(), current_frame, fps );
 }
 
+DllExport float native_vol_get_buffer_health_seconds_ctx( vol_context_t* ctx, float fps ) {
+    if ( !ctx ) { return 0.0f; }
+    return vol_geom_get_buffer_health_seconds(&ctx->geom_file_info, fps);
+}
 DllExport float native_vol_get_buffer_health_seconds(float fps) {
-    vol_geom_info_t g_info = native_vol_get_geom_info();
-    return vol_geom_get_buffer_health_seconds(&geom_file_ptr, fps);
+    return native_vol_get_buffer_health_seconds_ctx( _get_default_ctx(), fps );
 }
 
 
+DllExport bool native_vol_create_streaming_file_info_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return false; }
+    return vol_geom_create_streaming_file_info(&ctx->geom_file_info);
+}
 DllExport bool native_vol_create_streaming_file_info() {
-    return vol_geom_create_streaming_file_info(&geom_file_ptr);
+    return native_vol_create_streaming_file_info_ctx( _get_default_ctx() );
 }
 
+DllExport int native_vol_get_header_frame_body_start_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return 0; }
+    return vol_geom_get_sequence_offset(&ctx->geom_file_info);
+}
 DllExport int native_vol_get_header_frame_body_start(void) {
-    return vol_geom_get_sequence_offset(&geom_file_ptr);
+    return native_vol_get_header_frame_body_start_ctx( _get_default_ctx() );
 }
 
+DllExport void native_vol_reset_frame_directory_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return; }
+    return vol_geom_reset_frame_directory(&ctx->geom_file_info);
+}
 DllExport void native_vol_reset_frame_directory(void) {
-    return vol_geom_reset_frame_directory(&geom_file_ptr);
+    return native_vol_reset_frame_directory_ctx( _get_default_ctx() );
 }
 
-DllExport int native_vol_get_playback_buffer_size(void) {
+DllExport int native_vol_get_playback_buffer_size_ctx( vol_context_t* ctx ) {
+    if ( !ctx ) { return 0; }
     vol_geom_size_t buffer_size = 0;
-    const uint8_t* buffer = vol_geom_get_playback_buffer(&geom_file_ptr, &buffer_size);
+    const uint8_t* buffer = vol_geom_get_playback_buffer(&ctx->geom_file_info, &buffer_size);
     return buffer ? (int)buffer_size : 0;
+}
+DllExport int native_vol_get_playback_buffer_size(void) {
+    return native_vol_get_playback_buffer_size_ctx( _get_default_ctx() );
 }
 
 
