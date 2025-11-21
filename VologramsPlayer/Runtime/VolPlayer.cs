@@ -4,7 +4,7 @@
 // <author>Patrick Geoghegan</author>
 // <author>Jan Ondrej</author>
 // <date>21/11/25</date>
-// <version>1.1.5</version>
+// <version>1.2.0</version>
 // <summary>Controls for vologram playback</summary>
 
 using Codice.Utils;
