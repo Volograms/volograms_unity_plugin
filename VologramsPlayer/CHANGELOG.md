@@ -2,7 +2,10 @@ Volograms Unity SDK Release Notes
 
 Check the README in the for information on the VolPlayer component and FAQs
 
-**v1.1.4** (20-11-25)
+**v1.1.5** (20-11-25)
+* Fix bug from previous version that crashes volograms without audio.
+
+**v1.1.5** (21-11-25)
 * Fix issue with delayed audio playback. 
 
 **v1.1.3** (20-11-25)
