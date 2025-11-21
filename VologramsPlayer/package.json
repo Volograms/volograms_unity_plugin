@@ -1,6 +1,6 @@
 {
   "name": "com.volograms.vols-player",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "displayName": "VologramsPlayer",
   "description": "Plugin to play volumetric video .vols files.",
   "unity": "2019.1",

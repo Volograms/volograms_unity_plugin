@@ -1,8 +1,10 @@
 // <copyright file=VolPlayer company=Volograms>
-// Copyright (c) 2022 All Rights Reserved
+// Copyright (c) 2022 - 2025 All Rights Reserved
 // </copyright>
 // <author>Patrick Geoghegan</author>
-// <date>18/02/22</date>
+// <author>Jan Ondrej</author>
+// <date>21/11/25</date>
+// <version>1.1.5</version>
 // <summary>Controls for vologram playback</summary>
 
 using Codice.Utils;
@@ -763,7 +765,7 @@ namespace Volograms
                 _audioPlayerVideo.Play();
 
             }
-            if (audioOn && _audioPlayerVols != null)
+            if (audioOn && _audioPlayerVols != null && _audioPlayerVols.clip !=null)
             {
                 _audioPlayerVols.clip.LoadAudioData();
                 yield return new WaitUntil(() => _audioPlayerVols.clip.loadState == AudioDataLoadState.Loaded);
