@@ -4,7 +4,7 @@
 // <author>Patrick Geoghegan</author>
 // <author>Jan Ondrej</author>
 // <date>21/11/25</date>
-// <version>1.1.5</version>
+// <version>1.2.0</version>
 // <summary>Controls for vologram playback</summary>
 
 using Codice.Utils;
@@ -89,6 +89,7 @@ namespace Volograms
         private VolPluginInterface.VolGeometryData _geometryData;
         private byte[] _meshData;
         private int _textureId;
+        private VolPluginInterface.VolNativeContext _ctx;
         private VideoPlayer _audioPlayerVideo;
         private AudioSource _audioPlayerVols;
 
@@ -103,6 +104,8 @@ namespace Volograms
         /// </summary>
         private void Start()
         {
+            // Create native context per player instance
+            _ctx = new VolPluginInterface.VolNativeContext();
             //streamingMode = VolEnums.StreamingMode.Buffer;
 #if UNITY_EDITOR
             if (_meshFilter.sharedMesh == null)
@@ -143,7 +146,7 @@ namespace Volograms
                 // Wait until we have enough frames buffered ahead
                 if (streamingMode == VolEnums.StreamingMode.Buffer)
                 {
-                    float bufferHealthSeconds = VolPluginInterface.VolGetBufferHealthSeconds((float)_framesPerSecond);
+                    float bufferHealthSeconds = _ctx.GetBufferHealthSeconds((float)_framesPerSecond);
                     if (bufferHealthSeconds < bufferAheadSeconds)
                         return true;
                 }
@@ -155,9 +158,9 @@ namespace Volograms
             }
 
             if (streamingMode == VolEnums.StreamingMode.File)
-                isFrameAvailable = VolPluginInterface.VolGeomUpdateFramesDirectory(_fullGeomPath, lookaheadFrameIndex);
+                isFrameAvailable = _ctx.UpdateFramesDirectory(_fullGeomPath, lookaheadFrameIndex);
             else // Buffer mode
-                isFrameAvailable = VolPluginInterface.VolIsFrameAvailableInBuffer(desiredFrameIndex);
+                isFrameAvailable = _ctx.IsFrameAvailableInBuffer(desiredFrameIndex);
 
             if (!isFrameAvailable)
             {
@@ -236,8 +239,8 @@ namespace Volograms
                 }
 
                 // --GEOMETRY--
-                int previousKeyframeIndex = VolPluginInterface.VolGeomFindPreviousKeyframe(desiredFrameIndex);
-                bool desiredIsKeyframe = VolPluginInterface.VolGeomIsKeyframe(desiredFrameIndex);
+                int previousKeyframeIndex = _ctx.FindPrevKeyframe(desiredFrameIndex);
+                bool desiredIsKeyframe = _ctx.IsKeyframe(desiredFrameIndex);
                 // If our desired frame would jump over its proceeding keyframe, we need to stop and load that first,
                 // unless it is a keyframe itself.
                 bool needToLoadKeyframe = (_currentlyLoadedFrameIndex < previousKeyframeIndex) && !desiredIsKeyframe;
@@ -263,7 +266,7 @@ namespace Volograms
             {
                 _streamingSession.SetLoopStreaming(isLooping);
 
-                if (VolPluginInterface.VolShouldResumeDownload(_currentlyLoadedFrameIndex, (float)_framesPerSecond))
+                if (_ctx.ShouldResumeDownload(_currentlyLoadedFrameIndex, (float)_framesPerSecond))
                     _streamingSession.ResumeDownload();
 
             }
@@ -361,7 +364,7 @@ namespace Volograms
             }
             else
             {
-                _streamingSession = new VolStreamingSession(this);
+                _streamingSession = new VolStreamingSession(this, _ctx);
             }
 
             System.Action<bool> onHeaderOpen = isOpened =>
@@ -399,7 +402,7 @@ namespace Volograms
 
             if (_hasVideoTexture)
             {
-                bool openedVideo = VolPluginInterface.VolOpenFile(_fullVideoPath);
+                bool openedVideo = _ctx.OpenVideo(_fullVideoPath);
                 Debug.Log("Opened vologram video texture from: " + _fullVideoPath + " and " + openedVideo);
                 if (openedVideo)
                 {
@@ -432,12 +435,12 @@ namespace Volograms
                     _fullGeomPath = volFolderPathType.ResolvePath(volFolder);
                     string headerFile = Path.Combine(_fullGeomPath, "header.vols");
                     string sequenceFile = Path.Combine(_fullGeomPath, "sequence_0.vols");
-                    geomOpened = VolPluginInterface.VolGeomOpenFile(headerFile, sequenceFile, true);
+                    geomOpened = _ctx.OpenGeom(headerFile, sequenceFile, true);
 
                     if (geomOpened)
                     {
-                        int texWidth = VolPluginInterface.VolGetVideoWidth();
-                        int texHeight = VolPluginInterface.VolGetVideoHeight();
+                        int texWidth = _ctx.GetVideoWidth();
+                        int texHeight = _ctx.GetVideoHeight();
 
                         // Texture
                         _voloTexture = new Texture2D(
@@ -460,7 +463,7 @@ namespace Volograms
         /// <returns></returns>
         private IEnumerator OpenSingleFileSequence(bool geomOpened)
         {
-            bool initBasis = VolPluginInterface.VolInitBasisDecoder();
+            bool initBasis = _ctx.InitBasis();
             if (!initBasis)
             {
                 Debug.LogError("Failed to initialize Bassis texteure decoder.");
@@ -478,8 +481,8 @@ namespace Volograms
 #endif
                 try
                 {
-                    int texWidth = VolPluginInterface.VolGetTextureWidth();
-                    int texHeight = VolPluginInterface.VolGetTextureHeight();
+                    int texWidth = _ctx.GetTextureWidth();
+                    int texHeight = _ctx.GetTextureHeight();
 
                     if (texHeight > 0 && texWidth > 0)
                     {
@@ -495,11 +498,11 @@ namespace Volograms
                     Debug.LogError("Failed to create vologram texture. " + e.Message);
                 }
             }
-            if (audioOn && VolPluginInterface.VolHasAudio())
+            if (audioOn && _ctx.HasAudio())
             {
                 //Debug.Log("Loading Audio");
                 int audioSize;
-                IntPtr audioData = VolPluginInterface.VolGetAudio(out audioSize);
+                IntPtr audioData = _ctx.GetAudio(out audioSize);
                 if (audioData != IntPtr.Zero && audioSize > 0)
                 {
                     byte[] audioBytes = new byte[audioSize];
@@ -593,7 +596,7 @@ namespace Volograms
                 else
                 {
                     _fullGeomPath = volFilePathType.ResolvePath(volFile);
-                    geomOpened = VolPluginInterface.VolGeomOpenFile("", _fullGeomPath, false);
+                    geomOpened = _ctx.OpenGeom("", _fullGeomPath, false);
                 }
 
                 if (geomOpened)
@@ -605,7 +608,7 @@ namespace Volograms
             if (!geomOpened)
             {
                 if (_hasVideoTexture)
-                    VolPluginInterface.VolCloseFile();
+                    _ctx.CloseVideo();
                 IsOpen = false;
                 Close();
                 onComplete?.Invoke();
@@ -614,8 +617,8 @@ namespace Volograms
 
             _currentlyLoadedFrameIndex = -1;
             _animationAccumulatedSeconds = 0f;
-            _numFrames = VolPluginInterface.VolGeomGetFrameCount();
-            _framesPerSecond = VolPluginInterface.VolGetFrameRate();
+            _numFrames = _ctx.GetGeomFrameCount();
+            _framesPerSecond = _ctx.GetFrameRate();
             if (0.0 == _framesPerSecond) { _framesPerSecond = 30.0; }
             _secondsPerFrame = 1f / _framesPerSecond; // TODO(Anton) -- we should fetch this from vol_av rather than rely on 30fps.
 
@@ -699,8 +702,8 @@ namespace Volograms
 
             bool closedVideo = true;
             if (_hasVideoTexture)
-                closedVideo = VolPluginInterface.VolCloseFile();
-            bool freedGeom = VolPluginInterface.VolFreeGeomData();
+                closedVideo = _ctx.CloseVideo();
+            bool freedGeom = _ctx.FreeGeom();
 
             // Clean up temporary streaming file
             if (_isStreaming)
@@ -827,7 +830,7 @@ namespace Volograms
 
             if (_hasVideoTexture)
             {
-                bool openedVideo = VolPluginInterface.VolOpenFile(_fullVideoPath);
+                bool openedVideo = _ctx.OpenVideo(_fullVideoPath);
                 if (!openedVideo)
                 {
                     IsOpen = false;
@@ -836,7 +839,7 @@ namespace Volograms
             }
 
             // Handle a special case where we need a first frame after a restart and it is not in the buffer anymore.
-            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer && !VolPluginInterface.VolIsFrameAvailableInBuffer(0))
+            if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer && !_ctx.IsFrameAvailableInBuffer(0))
                 _streamingSession.RestartFromStart();
 
             _currentlyLoadedFrameIndex = -1;
@@ -1006,13 +1009,13 @@ namespace Volograms
             // Always skip ahead to desired frame. (This is a workaround until we get better video decoder seek behaviour).
             for (int videoFrameIndex = _currentlyLoadedFrameIndex; videoFrameIndex < desiredFrameIndex - 1; videoFrameIndex++)
             {
-                _colorPtr = VolPluginInterface.VolReadNextVideoFrame(false);
+                _colorPtr = _ctx.ReadNextVideoFrame(false);
             }
             // This is the frame we want, and we vertically flip this too.
-            _colorPtr = VolPluginInterface.VolReadNextVideoFrame(true);
+            _colorPtr = _ctx.ReadNextVideoFrame(true);
             if(_voloTexture)
             { // Upload only the texture from the desired frame to the GPU via Unity.
-                _voloTexture.LoadRawTextureData(_colorPtr, (int)VolPluginInterface.VolGetFrameSize());
+                _voloTexture.LoadRawTextureData(_colorPtr, (int)_ctx.GetFrameSize());
                 _voloTexture.Apply();
 #if UNITY_EDITOR
                 _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);
@@ -1041,10 +1044,10 @@ namespace Volograms
             // TextureFormat.DXT5 == cTFBC3_RGBA = 3,
             int textureFormat = 2;
 #endif
-            _colorPtr = VolPluginInterface.VolReadNextTextureFrame(textureFormat);
+            _colorPtr = _ctx.ReadNextTextureFrame(textureFormat);
             if (_voloTexture && _colorPtr != IntPtr.Zero)
             { // Upload only the texture from the desired frame to the GPU via Unity.
-                _voloTexture.LoadRawTextureData(_colorPtr, (int)VolPluginInterface.VolGetTextureSize());
+                _voloTexture.LoadRawTextureData(_colorPtr, (int)_ctx.GetTextureSize());
                 _voloTexture.Apply();
 #if UNITY_EDITOR
                 _meshRenderer.sharedMaterial.SetTexture(_textureId, _voloTexture);
@@ -1061,10 +1064,10 @@ namespace Volograms
         {
             if (frame >= _numFrames) { return false; }
 
-            bool isKeyframe = VolPluginInterface.VolGeomIsKeyframe(frame);
+            bool isKeyframe = _ctx.IsKeyframe(frame);
             if (_isStreaming && streamingMode == VolEnums.StreamingMode.Buffer)
             {
-                if (!VolPluginInterface.VolReadFrameStreaming(frame))
+                if (!_ctx.ReadFrameStreaming(frame))
                 {
                     Debug.LogError("Error loading geometry frame");
                     return false;
@@ -1079,14 +1082,14 @@ namespace Volograms
                 else
                     sequenceFile = _fullGeomPath;
 
-                if (!VolPluginInterface.VolGeomReadFrame(sequenceFile, frame))
+                if (!_ctx.ReadGeomFrame(sequenceFile, frame))
                 {
                     Debug.LogError("Error loading geometry frame");
                     return false;
                 }
             }
 
-            _geometryData = VolPluginInterface.VolGeomGetPtrData();
+            _geometryData = _ctx.GetGeomPtrData();
 
             if (_geometryData.blockDataSize == 0)
                 return false;
@@ -1200,6 +1203,19 @@ namespace Volograms
         private void AudioVideoPlayerOnFrameReady(VideoPlayer source, long frameidx)
         {
 
+        }
+
+        private void OnDestroy()
+        {
+            try
+            {
+                Close();
+            }
+            finally
+            {
+                _ctx?.Dispose();
+                _ctx = null;
+            }
         }
     }
 }

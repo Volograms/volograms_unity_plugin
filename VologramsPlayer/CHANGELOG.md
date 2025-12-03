@@ -2,6 +2,9 @@ Volograms Unity SDK Release Notes
 
 Check the README in the for information on the VolPlayer component and FAQs
 
+**v1.2.0** (20-11-25)
+* Add support for multiple volograms in the scene.
+
 **v1.1.5** (20-11-25)
 * Fix bug from previous version that crashes volograms without audio.
 
